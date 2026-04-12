@@ -13,12 +13,14 @@ const deduct_withrawModal = require("../models/deduct_withraw.model.js");
 const redAccountList = require("../models/redAccountList.model.js");
 const userTempModal = require("../models/userTemp.model.js");
 const add_bank_account = require("../models/add_bank_account.model.js");
+const imbOrderModal = require("../models/imbOrder.model.js");
 const ResultWebsiteLinksModel = require("../models/ResultWebsiteLinks.model.js");
 const moment = require("../js/moment.min.js");
 const mongoose = require("mongoose");
 var randomstring = require("randomstring");
 const { MongoClient } = require("mongodb");
 const axios = require("axios");
+const querystring = require("querystring");
 
 const Joi = require("joi");
 const schema = Joi.object({
@@ -108,6 +110,30 @@ const schemaadd_success_bank_account = Joi.object({
   user_id: Joi.string().required(),
   app_id: Joi.string().required(),
 });
+const schemaCreateImbOrder = Joi.object({
+  user_id: Joi.string().required(),
+  app_id: Joi.string().required(),
+  amount: Joi.number().greater(0).required(),
+  // user_token: Joi.string().required(),
+  customer_mobile: Joi.string().allow("").optional(),
+  order_id: Joi.string().allow("").optional(),
+  redirect_url: Joi.string().allow("").optional(),
+  remark1: Joi.string().allow("").optional(),
+  remark2: Joi.string().allow("").optional(),
+  webhook_url: Joi.string().allow("").optional(),
+  devName: Joi.string().allow("").optional(),
+  devType: Joi.string().allow("").optional(),
+  devId: Joi.string().allow("").optional(),
+});
+const schemaImbOrderStatus = Joi.object({
+  order_id: Joi.string().required(),
+  // user_token: Joi.string().required(),
+});
+
+const IMB_BASE_URL = process.env.IMB_BASE_URL || "https://secure-stage.imb.org.in";
+const IMB_CREATE_ORDER_PATH = "/api/create-order";
+const IMB_CHECK_ORDER_PATH = "/api/check-order-status";
+const IMB_USER_TOKEN = "7a7163ad52cc616002758a1e408a4a3b";
 exports.resultLink = async (req, res) => {
   try {
     const data = await ResultWebsiteLinksModel.find({
@@ -827,115 +853,644 @@ exports.single_market_result = async (req, res) => {
   }
 };
 
+// exports.deduct_user_balance = async (req, res) => {
+//   try {
+//     const result = schemadeduct_user_balance.validate(req.body);
+//     if (result.error) {
+//       res.status(200).json({ message: result.error.message });
+//     } else {
+//       const user = await User.findOne({
+//         user_id: req.body.userID,
+//         app_id: req.body.Token,
+//       });
+//       if (user) {
+//         var cod = req.body.cod;
+//         var userBal = user.toJSON().credit;
+//         if (cod == "SUCCESS") {
+//           var UpdatedBalance =
+//             parseInt(userBal) + parseInt(req.body.orderAmount);
+//           const appController = await appControllerModal.findOne();
+//           const currentDate = moment();
+//           const currentdate = currentDate.format("DD-MM-YYYY");
+//           const currentdateTime = currentDate.format("DD-MM-YYYY HH:mm:ss");
+//           //  const count06 = await pointTableModal.find().sort({ id: 'desc' }).limit(1).exec();
+//           //       if (count06.length>0) {
+//           //       var ids06 = count06[0].id + 1;
+//           //     } else {
+//           //       var ids06 = 1;
+//           //     }
+//           const pointstore11 = new pointTableModal({
+//             // id:ids06,
+//             app_id: req.body.Token,
+//             user_id: req.body.userID,
+//             transaction_id: req.body.referenceId,
+//             tr_nature: "TRDEPO002",
+//             tr_value: req.body.orderAmount,
+//             tr_value_updated: UpdatedBalance,
+//             value_update_by: "Deposit",
+//             tr_value_type: "Credit",
+//             tr_device: req.body.devName,
+//             date: currentdate,
+//             date_time: currentdateTime,
+//             tr_remark: "Online",
+//             tr_status: "Pending",
+//             is_deleted: "0",
+//             device_type: req.body.devType,
+//             device_id: req.body.devId,
+//             admin_key: "ADMIN0001",
+//             upi_id: appController.toJSON().upiId,
+//           });
+//           pointstore11.save();
+//           //  const count07 = await walletReportModal.find().sort({ id: 'desc' }).limit(1).exec();
+//           //       if (count07.length>0) {
+
+//           //       var ids07 = count07[0].id + 1;
+//           //     } else {
+//           //       var ids07 = 1;
+//           //     }
+//           const wallettore11 = new walletReportModal({
+//             // id:ids07,
+//             type: "Credit",
+//             transaction_id: req.body.referenceId,
+//             value_update_by: "Deposit",
+//             user_id: req.body.user_id,
+//             app_id: req.body.Token,
+//             tr_nature: "TRDEPO002",
+//             tr_value: req.body.orderAmount,
+//             tr_value_updated: UpdatedBalance,
+//             date: currentdate,
+//             date_time: currentdateTime,
+//             tr_status: "Pending",
+//             tr_remark: "Online",
+//           });
+//           wallettore11.save();
+//           res.status(200).send({ status: "1", message: req.body.txMsg });
+//         } else {
+//           const currentDate = moment();
+//           // Format the date
+//           const currentdate = currentDate.format("DD-MM-YYYY");
+//           const currentdateTime = currentDate.format("DD-MM-YYYY HH:mm:ss");
+//           //  const count08 = await usercoinModal.find().sort({ id: 'desc' }).limit(1).exec();
+//           //       if (count08.length>0) {
+//           //       var ids08 = count08[0].id + 1;
+//           //     } else {
+//           //       var ids08 = 1;
+//           //     }
+//           const usercoin = new usercoinModal({
+//             // id:ids08,
+//             user_id: req.body.user_id,
+//             money: req.body.orderAmount,
+//             transStatus: req.body.txStatus,
+//             upiId: req.body.upiID,
+//             TranID: req.body.orderId,
+//             TDate: currentdateTime,
+//           });
+//           usercoin.save();
+//           res.status(200).send({ status: "2", message: req.body.txMsg });
+//           return;
+//         }
+//       } else {
+//         res
+//           .status(200)
+//           .send({ status: "0", message: "User Not Available Or Blocked" });
+//         return;
+//       }
+//     }
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//     return;
+//   }
+// };
+const getRequestBaseUrl = (req) => {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const protocol = forwardedProto
+    ? String(forwardedProto).split(",")[0]
+    : req.protocol;
+  return `${protocol}://${req.get("host")}`;
+};
+
+const getProviderOrderStatus = (data = {}) => {
+  return (
+    data?.status_text ||
+    data?.order_status ||
+    data?.payment_status ||
+    data?.data?.status ||
+    data?.data?.order_status ||
+    data?.result?.status ||
+    data?.status ||
+    ""
+  );
+};
+
+const isProviderSuccessStatus = (statusValue) => {
+  const normalizedStatus = String(statusValue || "").trim().toUpperCase();
+  return [
+    "SUCCESS",
+    "SUCCESSFUL",
+    "COMPLETED",
+    "PAID",
+    "CAPTURED",
+    "TRUE",
+    "1",
+  ].includes(normalizedStatus);
+};
+
+const createDepositLedgerEntry = async ({
+  appId,
+  userId,
+  userCredit,
+  orderAmount,
+  referenceId,
+  devName,
+  devType,
+  devId,
+  txMsg,
+  remark,
+  paymentMode,
+  upiId,
+}) => {
+  const existingDeposit = await pointTableModal.findOne({
+    app_id: appId,
+    user_id: userId,
+    tr_nature: "TRDEPO002",
+    transaction_id: referenceId,
+  });
+  if (existingDeposit) {
+    return {
+      alreadyProcessed: true,
+      updatedBalance: existingDeposit.tr_value_updated,
+    };
+  }
+
+  const updatedBalance = parseInt(userCredit || 0) + parseInt(orderAmount || 0);
+  const appController = await appControllerModal.findOne({ app_id: appId });
+  const fallbackAppController =
+    appController || (await appControllerModal.findOne());
+  const now = moment();
+  const currentdate = now.format("DD-MM-YYYY");
+  const currentdateTime = now.format("DD-MM-YYYY HH:mm:ss");
+
+  const pointstore11 = new pointTableModal({
+    app_id: appId,
+    user_id: userId,
+    transaction_id: referenceId,
+    tr_nature: "TRDEPO002",
+    tr_value: orderAmount,
+    tr_value_updated: updatedBalance,
+    value_update_by: "Deposit",
+    tr_value_type: "Credit",
+    tr_device: devName || "WEB",
+    date: currentdate,
+    date_time: currentdateTime,
+    tr_remark: remark || "Online",
+    tr_status: "Pending",
+    is_deleted: "0",
+    device_type: devType || "web",
+    device_id: devId || "WEB",
+    admin_key: "ADMIN0001",
+    upi_id: fallbackAppController ? fallbackAppController.toJSON().upiId : null,
+  });
+
+  const wallettore11 = new walletReportModal({
+    type: "Credit",
+    transaction_id: referenceId,
+    value_update_by: "Deposit",
+    user_id: userId,
+    app_id: appId,
+    tr_nature: "TRDEPO002",
+    tr_value: orderAmount,
+    tr_value_updated: updatedBalance,
+    date: currentdate,
+    date_time: currentdateTime,
+    tr_status: "Pending",
+    tr_remark: remark || "Online",
+  });
+
+  await pointstore11.save();
+  await wallettore11.save();
+
+  return {
+    alreadyProcessed: false,
+    updatedBalance,
+    message: txMsg || "Deposit request created.",
+    paymentMode: paymentMode || "Online",
+    upiId: upiId || null,
+  };
+};
+
+const syncImbOrderFromProvider = async ({
+  orderDoc,
+  reqBody = {},
+  payloadSnapshot = null,
+}) => {
+  const orderId = String(orderDoc.order_id || "");
+  const userToken = orderDoc.user_token;
+  if (!orderId || !userToken) {
+    await imbOrderModal.updateOne(
+      { _id: orderDoc._id },
+      {
+        $set: {
+          status: "PENDING",
+          payment_status: "TOKEN_MISSING",
+          last_response: payloadSnapshot || reqBody || null,
+          updated_at: new Date(),
+        },
+      }
+    );
+    return {
+      order_id: orderId || null,
+      status: "TOKEN_MISSING",
+      is_success: false,
+      ledger_message: null,
+    };
+  }
+
+  const providerResponse = await axios.post(
+    `${IMB_BASE_URL}${IMB_CHECK_ORDER_PATH}`,
+    querystring.stringify({
+      user_token: userToken,
+      order_id: orderId,
+    }),
+    {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      timeout: 20000,
+    }
+  );
+
+  const responseData = providerResponse?.data || {};
+  const providerStatus = getProviderOrderStatus(responseData);
+  const isSuccess = isProviderSuccessStatus(providerStatus);
+  const refId =
+    responseData?.referenceId ||
+    responseData?.transaction_id ||
+    responseData?.txn_id ||
+    orderDoc.reference_id ||
+    orderId;
+
+  await imbOrderModal.updateOne(
+    { _id: orderDoc._id },
+    {
+      $set: {
+        payment_status: String(providerStatus || "UNKNOWN"),
+        status: isSuccess ? "PAID" : "PENDING",
+        reference_id: refId,
+        last_response: payloadSnapshot || responseData,
+        updated_at: new Date(),
+      },
+    }
+  );
+
+  let ledgerMessage = null;
+  if (isSuccess) {
+    const user = await User.findOne({
+      user_id: orderDoc.user_id,
+      app_id: orderDoc.app_id,
+    });
+    if (user) {
+      const ledger = await createDepositLedgerEntry({
+        appId: orderDoc.app_id,
+        userId: orderDoc.user_id,
+        userCredit: user.toJSON().credit,
+        orderAmount: Number(orderDoc.amount),
+        referenceId: refId,
+        devName: reqBody.devName || "WEB",
+        devType: reqBody.devType || "web",
+        devId: reqBody.devId || "WEB",
+        txMsg: responseData?.message || "Payment verified.",
+        remark: "IMB",
+        paymentMode: responseData?.payment_mode || "Online",
+        upiId: responseData?.upiID || responseData?.upi_id || null,
+      });
+      ledgerMessage = ledger.alreadyProcessed
+        ? "Transaction already processed."
+        : "Deposit entry created.";
+    }
+  }
+
+  return {
+    order_id: orderId,
+    status: providerStatus || "UNKNOWN",
+    is_success: isSuccess,
+    ledger_message: ledgerMessage,
+    provider_data: responseData,
+  };
+};
+
 exports.deduct_user_balance = async (req, res) => {
   try {
     const result = schemadeduct_user_balance.validate(req.body);
     if (result.error) {
       res.status(200).json({ message: result.error.message });
-    } else {
-      const user = await User.findOne({
-        user_id: req.body.userID,
-        app_id: req.body.Token,
-      });
-      if (user) {
-        var cod = req.body.cod;
-        var userBal = user.toJSON().credit;
-        if (cod == "SUCCESS") {
-          var UpdatedBalance =
-            parseInt(userBal) + parseInt(req.body.orderAmount);
-          const appController = await appControllerModal.findOne();
-          const currentDate = moment();
-          const currentdate = currentDate.format("DD-MM-YYYY");
-          const currentdateTime = currentDate.format("DD-MM-YYYY HH:mm:ss");
-          //  const count06 = await pointTableModal.find().sort({ id: 'desc' }).limit(1).exec();
-          //       if (count06.length>0) {
-          //       var ids06 = count06[0].id + 1;
-          //     } else {
-          //       var ids06 = 1;
-          //     }
-          const pointstore11 = new pointTableModal({
-            // id:ids06,
-            app_id: req.body.Token,
-            user_id: req.body.userID,
-            transaction_id: req.body.referenceId,
-            tr_nature: "TRDEPO002",
-            tr_value: req.body.orderAmount,
-            tr_value_updated: UpdatedBalance,
-            value_update_by: "Deposit",
-            tr_value_type: "Credit",
-            tr_device: req.body.devName,
-            date: currentdate,
-            date_time: currentdateTime,
-            tr_remark: "Online",
-            tr_status: "Pending",
-            is_deleted: "0",
-            device_type: req.body.devType,
-            device_id: req.body.devId,
-            admin_key: "ADMIN0001",
-            upi_id: appController.toJSON().upiId,
-          });
-          pointstore11.save();
-          //  const count07 = await walletReportModal.find().sort({ id: 'desc' }).limit(1).exec();
-          //       if (count07.length>0) {
-
-          //       var ids07 = count07[0].id + 1;
-          //     } else {
-          //       var ids07 = 1;
-          //     }
-          const wallettore11 = new walletReportModal({
-            // id:ids07,
-            type: "Credit",
-            transaction_id: req.body.referenceId,
-            value_update_by: "Deposit",
-            user_id: req.body.user_id,
-            app_id: req.body.Token,
-            tr_nature: "TRDEPO002",
-            tr_value: req.body.orderAmount,
-            tr_value_updated: UpdatedBalance,
-            date: currentdate,
-            date_time: currentdateTime,
-            tr_status: "Pending",
-            tr_remark: "Online",
-          });
-          wallettore11.save();
-          res.status(200).send({ status: "1", message: req.body.txMsg });
-        } else {
-          const currentDate = moment();
-          // Format the date
-          const currentdate = currentDate.format("DD-MM-YYYY");
-          const currentdateTime = currentDate.format("DD-MM-YYYY HH:mm:ss");
-          //  const count08 = await usercoinModal.find().sort({ id: 'desc' }).limit(1).exec();
-          //       if (count08.length>0) {
-          //       var ids08 = count08[0].id + 1;
-          //     } else {
-          //       var ids08 = 1;
-          //     }
-          const usercoin = new usercoinModal({
-            // id:ids08,
-            user_id: req.body.user_id,
-            money: req.body.orderAmount,
-            transStatus: req.body.txStatus,
-            upiId: req.body.upiID,
-            TranID: req.body.orderId,
-            TDate: currentdateTime,
-          });
-          usercoin.save();
-          res.status(200).send({ status: "2", message: req.body.txMsg });
-          return;
-        }
-      } else {
-        res
-          .status(200)
-          .send({ status: "0", message: "User Not Available Or Blocked" });
-        return;
-      }
+      return;
     }
+
+    const userId = req.body.userID;
+    const appId = req.body.Token;
+    const user = await User.findOne({
+      user_id: userId,
+      app_id: appId,
+    });
+
+    if (!user) {
+      res
+        .status(200)
+        .send({ status: "0", message: "User Not Available Or Blocked" });
+      return;
+    }
+
+    if (String(req.body.cod).toUpperCase() === "SUCCESS") {
+      const ledger = await createDepositLedgerEntry({
+        appId,
+        userId,
+        userCredit: user.toJSON().credit,
+        orderAmount: req.body.orderAmount,
+        referenceId: req.body.referenceId || req.body.orderId,
+        devName: req.body.devName,
+        devType: req.body.devType,
+        devId: req.body.devId,
+        txMsg: req.body.txMsg,
+        remark: "Online",
+        paymentMode: req.body.paymentMode,
+        upiId: req.body.upiID,
+      });
+
+      res.status(200).send({
+        status: "1",
+        message: ledger.alreadyProcessed
+          ? "Transaction already processed."
+          : req.body.txMsg,
+      });
+      return;
+    }
+
+    const currentdateTime = moment().format("DD-MM-YYYY HH:mm:ss");
+    const usercoin = new usercoinModal({
+      user_id: userId,
+      money: req.body.orderAmount,
+      transStatus: req.body.txStatus,
+      upiId: req.body.upiID,
+      TranID: req.body.orderId,
+      TDate: currentdateTime,
+    });
+    await usercoin.save();
+    res.status(200).send({ status: "2", message: req.body.txMsg });
+    return;
   } catch (error) {
     res.status(500).json({ error: error.message });
     return;
   }
 };
 
+exports.create_imb_order = async (req, res) => {
+  try {
+    const validation = schemaCreateImbOrder.validate(req.body);
+    if (validation.error) {
+      return res.status(400).json({ success: "0", message: validation.error.message });
+    }
+
+    const user = await User.findOne({
+      user_id: req.body.user_id,
+      app_id: req.body.app_id,
+      user_status: { $in: [1, "1"] },
+    });
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: "0", message: "User Not Available Or Blocked" });
+    }
+
+    const generatedOrderId =
+      req.body.order_id || `${String(req.body.user_id)}${Date.now()}`;
+    const webhookUrl =
+      req.body.webhook_url || `${getRequestBaseUrl(req)}/imb-api/api/webhook`;
+    const payload = {
+      customer_mobile:
+        req.body.customer_mobile || String(user.toJSON().mob || ""),
+      user_token: IMB_USER_TOKEN,
+      amount: String(req.body.amount),
+      order_id: generatedOrderId,
+      redirect_url: req.body.redirect_url || "",
+      remark1: req.body.remark1 || "",
+      remark2: req.body.remark2 || "",
+      webhook_url: webhookUrl,
+    };
+
+    const response = await axios.post(
+      `${IMB_BASE_URL}${IMB_CREATE_ORDER_PATH}`,
+      querystring.stringify(payload),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        },
+        timeout: 20000,
+      }
+    );
+
+    const responseData = response?.data || {};
+    const providerStatus = getProviderOrderStatus(responseData) || "CREATED";
+    const paymentUrl =
+      responseData?.payment_url ||
+      responseData?.payment_link ||
+      responseData?.pay_url ||
+      responseData?.url ||
+      responseData?.redirect_url ||
+      null;
+
+    await imbOrderModal.findOneAndUpdate(
+      { order_id: generatedOrderId },
+      {
+        $set: {
+          order_id: generatedOrderId,
+          user_id: req.body.user_id,
+          app_id: req.body.app_id,
+          amount: Number(req.body.amount),
+          user_token: IMB_USER_TOKEN,
+          status: "CREATED",
+          payment_status: String(providerStatus),
+          payment_url: paymentUrl,
+          webhook_url: webhookUrl,
+          last_response: responseData,
+          updated_at: new Date(),
+        },
+        $setOnInsert: {
+          created_at: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+
+    return res.status(200).json({
+      success: "1",
+      message: responseData?.message || "Order created successfully.",
+      order_id: generatedOrderId,
+      webhook_url: webhookUrl,
+      ...responseData,
+    });
+  } catch (error) {
+    const providerMessage =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Unable to create payment order.";
+    return res.status(502).json({
+      success: "0",
+      message: providerMessage,
+      provider_response: error?.response?.data || null,
+    });
+  }
+};
+
+exports.check_imb_order_status = async (req, res) => {
+  try {
+    const validation = schemaImbOrderStatus.validate(req.body);
+    if (validation.error) {
+      return res.status(400).json({ success: "0", message: validation.error.message });
+    }
+
+    const localOrder = await imbOrderModal.findOne({ order_id: req.body.order_id });
+    const payload = {
+      user_token: IMB_USER_TOKEN,
+      order_id: req.body.order_id,
+    };
+
+    const response = await axios.post(
+      `${IMB_BASE_URL}${IMB_CHECK_ORDER_PATH}`,
+      querystring.stringify(payload),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        },
+        timeout: 20000,
+      }
+    );
+
+    const responseData = response?.data || {};
+    const providerStatus = getProviderOrderStatus(responseData);
+    const isSuccess = isProviderSuccessStatus(providerStatus);
+
+    if (localOrder) {
+      const syncResult = await syncImbOrderFromProvider({
+        orderDoc: localOrder,
+        reqBody: req.body,
+      });
+      return res.status(200).json({
+        success: "1",
+        message: responseData?.message || "Status fetched",
+        order_id: req.body.order_id,
+        status: syncResult.status,
+        is_success: syncResult.is_success,
+        ledger_message: syncResult.ledger_message,
+        data: responseData,
+      });
+    }
+
+    return res.status(200).json({
+      success: "1",
+      message: responseData?.message || "Status fetched",
+      order_id: req.body.order_id,
+      status: providerStatus || "UNKNOWN",
+      is_success: isSuccess,
+      ledger_message: null,
+      data: responseData,
+    });
+  } catch (error) {
+    const providerMessage =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Unable to check order status.";
+    return res.status(502).json({
+      success: "0",
+      message: providerMessage,
+      provider_response: error?.response?.data || null,
+    });
+  }
+};
+
+exports.imb_payment_webhook = async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const orderId = payload.order_id || payload.orderId;
+    if (orderId) {
+      const localOrder = await imbOrderModal.findOne({ order_id: String(orderId) });
+      if (!localOrder) {
+        return res.status(200).json({
+          success: "1",
+          message: "Webhook received. Local order not found.",
+          order_id: String(orderId),
+        });
+      }
+
+      const result = await syncImbOrderFromProvider({
+        orderDoc: localOrder,
+        reqBody: payload,
+        payloadSnapshot: payload,
+      });
+
+      return res.status(200).json({
+        success: "1",
+        message: "Webhook processed successfully.",
+        order_id: String(orderId),
+        status: result.status,
+        is_success: result.is_success,
+        ledger_message: result.ledger_message,
+      });
+    }
+
+    const syncLimit = Math.max(
+      1,
+      Math.min(parseInt(payload.limit || 20), 100)
+    );
+    const pendingOrders = await imbOrderModal
+      .find({ status: { $in: ["CREATED", "PENDING"] } })
+      .sort({ updated_at: 1, created_at: 1 })
+      .limit(syncLimit);
+
+    if (!pendingOrders.length) {
+      return res.status(200).json({
+        success: "1",
+        message: "No pending orders found for sync.",
+        synced_count: 0,
+      });
+    }
+
+    const results = [];
+    for (const orderDoc of pendingOrders) {
+      try {
+        const result = await syncImbOrderFromProvider({
+          orderDoc,
+          reqBody: payload,
+          payloadSnapshot: payload,
+        });
+        results.push({
+          order_id: result.order_id,
+          status: result.status,
+          is_success: result.is_success,
+          ledger_message: result.ledger_message,
+        });
+      } catch (syncErr) {
+        results.push({
+          order_id: String(orderDoc.order_id),
+          status: "ERROR",
+          is_success: false,
+          error: syncErr.message,
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: "1",
+      message: "Pending order sync completed.",
+      synced_count: results.length,
+      results,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: "0",
+      message: error.message || "Unable to process webhook.",
+    });
+  }
+};
 exports.app_manager = async (req, res) => {
   try {
     const result = schemaapp_manager.validate(req.body);

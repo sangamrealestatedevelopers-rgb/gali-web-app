@@ -58,6 +58,9 @@ module.exports = (app) => {
   router.post("/addMsg-Group", home.addMsgGroup);
   router.post("/deduct-withdrawweb", home.deduct_withdrawweb);
   router.post("/deduct-withdrawUpiweb", home.deduct_withdrawUpiweb);
+  router.post("/imb-create-order", home.create_imb_order);
+  router.post("/imb-check-order-status", home.check_imb_order_status);
+  router.post("/imb-payment-webhook", home.imb_payment_webhook);
   router.post("/add-bank-account", home.add_bank_account);
   router.post("/get-all-bank-account", home.get_bank_accountAll);
   router.post("/get-success-bank-account", home.get_bank_accountSuccess);
@@ -69,6 +72,10 @@ module.exports = (app) => {
   router.post("/manage-commission", users.manageCommission);
 
   // router.post("/web-Audio", chatStore.web_Audio);
+
+  app.post("/imb-api/api/create-order", home.create_imb_order);
+  app.post("/imb-api/api/check-order-status", home.check_imb_order_status);
+  app.post("/imb-api/api/webhook", home.imb_payment_webhook);
 
   app.use("/api/users", router);
   // app.use('/api/wallet', router);
