@@ -4,6 +4,8 @@ const imbOrderSchema = new mongoose.Schema(
   {
     order_id: { type: String, index: true },
     user_id: { type: String, index: true },
+    /** userTemps._id (string) — links OTP/temp row to this payment */
+    user_temp_id: { type: String, index: true, default: null },
     app_id: { type: String, index: true },
     amount: { type: Number, default: 0 },
     user_token: { type: String, default: null },

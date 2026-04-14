@@ -45,6 +45,11 @@ const schemaSingleMarketResult = Joi.object({
   market_id: Joi.string().required(),
   type: Joi.string().required(),
 });
+const schemaAllGameResultsByMonth = Joi.object({
+  app_id: Joi.string().allow("").optional(),
+  /** Supported: YYYY-MM, MM-YYYY, MMMM YYYY (e.g. March 2026) */
+  month: Joi.string().required(),
+});
 const schemadeduct_user_balance = Joi.object({
   orderId: Joi.string().required(),
   orderAmount: Joi.number().required(),
@@ -115,6 +120,8 @@ const schemaCreateImbOrder = Joi.object({
   app_id: Joi.string().required(),
   amount: Joi.number().greater(0).required(),
   // user_token: Joi.string().required(),
+  /** Optional: userTemps document _id; if omitted, resolved by user mobile */
+  user_temp_id: Joi.string().allow("").optional(),
   customer_mobile: Joi.string().allow("").optional(),
   order_id: Joi.string().allow("").optional(),
   redirect_url: Joi.string().allow("").optional(),
@@ -127,13 +134,122 @@ const schemaCreateImbOrder = Joi.object({
 });
 const schemaImbOrderStatus = Joi.object({
   order_id: Joi.string().required(),
-  // user_token: Joi.string().required(),
+  user_token: Joi.string().allow("").optional(),
+  devName: Joi.string().allow("").optional(),
+  devType: Joi.string().allow("").optional(),
+  devId: Joi.string().allow("").optional(),
 });
+
+const schemaImbListOrders = Joi.object({
+  app_id: Joi.string().allow("").optional(),
+  /** omit or "all" = every status */
+  status: Joi.string().allow("").optional(),
+  page: Joi.number().integer().min(1).optional(),
+  page_size: Joi.number().integer().min(1).max(500).optional(),
+});
+
+const schemaImbSyncPending = Joi.object({
+  /** max 5000; use sync_all to take a high default */
+  limit: Joi.number().integer().min(1).max(5000).optional(),
+  sync_all: Joi.boolean().optional(),
+  app_id: Joi.string().allow("").optional(),
+  /** Also re-check IMB for locally FAILED orders (paid may arrive late). */
+  include_failed: Joi.boolean().optional(),
+  devName: Joi.string().allow("").optional(),
+  devType: Joi.string().allow("").optional(),
+  devId: Joi.string().allow("").optional(),
+});
+
+const coerceImbSyncPendingBody = (body) => {
+  const b = { ...(body || {}) };
+  if (b.sync_all === "true" || b.sync_all === "1") b.sync_all = true;
+  if (b.sync_all === "false" || b.sync_all === "0") b.sync_all = false;
+  if (b.include_failed === "true" || b.include_failed === "1") b.include_failed = true;
+  if (b.include_failed === "false" || b.include_failed === "0") b.include_failed = false;
+  return b;
+};
 
 const IMB_BASE_URL = process.env.IMB_BASE_URL || "https://secure-stage.imb.org.in";
 const IMB_CREATE_ORDER_PATH = "/api/create-order";
 const IMB_CHECK_ORDER_PATH = "/api/check-order-status";
 const IMB_USER_TOKEN = "7a7163ad52cc616002758a1e408a4a3b";
+
+const parseMonthFilter = (rawMonth) => {
+  const s = String(rawMonth || "").trim();
+  if (!s) return null;
+
+  const formats = ["YYYY-MM", "MM-YYYY", "MMMM YYYY", "MMM YYYY"];
+  for (const fmt of formats) {
+    const m = moment(s, fmt, true);
+    if (m && m.isValid && m.isValid()) {
+      return {
+        year: m.format("YYYY"),
+        monthNumber: m.format("MM"),
+        monthLabel: m.format("MMMM YYYY"),
+      };
+    }
+  }
+  return null;
+};
+
+/** Accept string or nested { order_id } from bad clients; reject "[object Object]" */
+const normalizeImbOrderId = (raw) => {
+  if (raw == null || raw === "") return "";
+  if (typeof raw === "object" && raw !== null) {
+    const nested =
+      raw.order_id ?? raw.orderId ?? raw.id ?? raw.order?.order_id;
+    if (nested != null && nested !== "") return String(nested).trim();
+    return "";
+  }
+  const s = String(raw).trim();
+  if (!s || s === "[object Object]") return "";
+  return s;
+};
+
+const isImbUnsupportedContentTypeResponse = (data) => {
+  if (!data || typeof data !== "object") return false;
+  const msg = String(data.message || data.msg || "").toLowerCase();
+  return (
+    msg.includes("unsupported content-type") ||
+    (msg.includes("content-type") && msg.includes("unsupported"))
+  );
+};
+
+/** IMB check-order: prefer JSON (stage often rejects form with "Unsupported Content-Type"). */
+const fetchImbCheckOrderStatus = async ({ user_token, order_id }) => {
+  const token = user_token || IMB_USER_TOKEN;
+  const url = `${IMB_BASE_URL}${IMB_CHECK_ORDER_PATH}`;
+  const formBody = querystring.stringify({ user_token: token, order_id });
+
+  const postForm = () =>
+    axios.post(url, formBody, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      timeout: 20000,
+    });
+
+  try {
+    const res = await axios.post(
+      url,
+      { user_token: token, order_id },
+      {
+        headers: { "Content-Type": "application/json" },
+        timeout: 20000,
+      }
+    );
+    if (isImbUnsupportedContentTypeResponse(res.data)) {
+      return postForm();
+    }
+    return res;
+  } catch (err) {
+    const status = err.response?.status;
+    if (status === 415 || status === 400 || status === 406) {
+      return postForm();
+    }
+    throw err;
+  }
+};
 exports.resultLink = async (req, res) => {
   try {
     const data = await ResultWebsiteLinksModel.find({
@@ -853,6 +969,123 @@ exports.single_market_result = async (req, res) => {
   }
 };
 
+/**
+ * Month wise all market results in one response (table-friendly).
+ * Input month examples: "2026-03", "03-2026", "March 2026"
+ */
+exports.all_game_results_by_month = async (req, res) => {
+  try {
+    const { error, value } = schemaAllGameResultsByMonth.validate(req.body || {}, {
+      stripUnknown: true,
+      convert: true,
+    });
+    if (error) {
+      return res.status(200).json({ success: "0", message: error.message });
+    }
+
+    const parsed = parseMonthFilter(value.month);
+    if (!parsed) {
+      return res.status(200).json({
+        success: "0",
+        message: "Invalid month. Use YYYY-MM, MM-YYYY, or MMMM YYYY.",
+      });
+    }
+
+    const appId = String(value.app_id || "").trim();
+    const monthSuffixRegex = new RegExp(`-${parsed.monthNumber}-${parsed.year}$`);
+
+    const marketQuery = { is_deleted: { $ne: true } };
+    if (appId) {
+      marketQuery.app_id = appId;
+    }
+
+    const markets = await comxMarketModel
+      .find(marketQuery)
+      .sort({ market_position: 1, market_name: 1 })
+      .select("market_id market_name")
+      .lean();
+
+    if (!markets.length) {
+      return res.status(200).json({
+        success: "0",
+        message: "No markets found for this app.",
+      });
+    }
+
+    const marketMap = {};
+    const marketIds = [];
+    for (const m of markets) {
+      const id = String(m.market_id || "").trim();
+      if (!id) continue;
+      marketIds.push(id);
+      marketMap[id] = String(m.market_name || id).trim();
+    }
+
+    const resultBaseQuery = {
+      market_id: { $in: marketIds },
+      date: { $regex: monthSuffixRegex },
+    };
+    let resultRows = [];
+    let appFilterApplied = false;
+
+    if (appId) {
+      resultRows = await resultTableModal
+        .find({ ...resultBaseQuery, app_id: appId })
+        .select("date market_id result")
+        .lean();
+      appFilterApplied = true;
+    }
+
+    if (!resultRows.length) {
+      resultRows = await resultTableModal
+        .find(resultBaseQuery)
+        .select("date market_id result")
+        .lean();
+    }
+
+    const byDate = {};
+    for (const row of resultRows) {
+      const date = String(row.date || "").trim();
+      const marketId = String(row.market_id || "").trim();
+      if (!date || !marketId) continue;
+
+      if (!byDate[date]) byDate[date] = { date };
+      byDate[date][marketId] = String(row.result || "XX").trim() || "XX";
+    }
+
+    const sortedDates = Object.keys(byDate).sort((a, b) => {
+      const da = moment(a, "DD-MM-YYYY", true);
+      const db = moment(b, "DD-MM-YYYY", true);
+      if (da.isValid() && db.isValid()) return da.valueOf() - db.valueOf();
+      return a.localeCompare(b);
+    });
+
+    const data = sortedDates.map((d) => {
+      const row = { date: d };
+      for (const id of marketIds) {
+        const key = marketMap[id];
+        row[key] = byDate[d][id] || "XX";
+      }
+      return row;
+    });
+
+    return res.status(200).json({
+      success: "1",
+      message: "Month-wise all market results fetched successfully.",
+      filter: {
+        app_id: appId || null,
+        month: parsed.monthLabel,
+      },
+      app_filter_applied: appFilterApplied,
+      columns: ["date", ...marketIds.map((id) => marketMap[id])],
+      total_days: data.length,
+      data,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: "0", message: error.message });
+  }
+};
+
 // exports.deduct_user_balance = async (req, res) => {
 //   try {
 //     const result = schemadeduct_user_balance.validate(req.body);
@@ -969,20 +1202,27 @@ const getRequestBaseUrl = (req) => {
   return `${protocol}://${req.get("host")}`;
 };
 
+/** Prefer payment/order fields over generic `status` (often ERROR / false while payment is PAID). */
 const getProviderOrderStatus = (data = {}) => {
-  return (
-    data?.status_text ||
-    data?.order_status ||
-    data?.payment_status ||
-    data?.data?.status ||
-    data?.data?.order_status ||
-    data?.result?.status ||
-    data?.status ||
-    ""
-  );
+  const v =
+    data?.payment_status ??
+    data?.order_status ??
+    data?.status_text ??
+    data?.data?.payment_status ??
+    data?.data?.order_status ??
+    data?.data?.status ??
+    data?.result?.payment_status ??
+    data?.result?.order_status ??
+    data?.result?.status ??
+    data?.transaction_status ??
+    data?.txn_status ??
+    data?.status_text ??
+    data?.status;
+  return v != null && v !== "" ? v : "";
 };
 
 const isProviderSuccessStatus = (statusValue) => {
+  if (statusValue === true) return true;
   const normalizedStatus = String(statusValue || "").trim().toUpperCase();
   return [
     "SUCCESS",
@@ -992,7 +1232,240 @@ const isProviderSuccessStatus = (statusValue) => {
     "CAPTURED",
     "TRUE",
     "1",
+    "OK",
+    "APPROVED",
+    "SETTLED",
+    "DONE",
+    "CLOSED",
   ].includes(normalizedStatus);
+};
+
+/** Extra IMB shapes: success flag, nested payment strings */
+const inferImbPaymentSuccess = (d = {}) => {
+  if (!d || typeof d !== "object") return false;
+
+  const msg = String(d.message || d.msg || "");
+  if (/\bnot found\b/i.test(msg) || /\binvalid\s+order\b/i.test(msg)) {
+    return false;
+  }
+
+  if (d.success === true || d.success === 1 || String(d.success) === "1") {
+    return true;
+  }
+
+  const blob = [
+    d.payment_status,
+    d.order_status,
+    d.data?.payment_status,
+    d.data?.order_status,
+    d.result?.payment_status,
+    d.status_text,
+  ]
+    .filter((x) => x != null && x !== "")
+    .map((x) => String(x).toLowerCase())
+    .join(" ");
+
+  return /\b(paid|success|completed|captured|approved|settled|successful)\b/i.test(
+    blob
+  );
+};
+
+/** Merge nested string JSON (some gateways send data: "{...}") */
+const normalizeImbPayload = (raw) => {
+  let p = raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw } : {};
+  if (typeof raw === "string") {
+    try {
+      p = JSON.parse(raw);
+    } catch {
+      p = { raw };
+    }
+  }
+  if (p.data != null && typeof p.data === "string") {
+    try {
+      const inner = JSON.parse(p.data);
+      p = { ...p, ...inner, data: inner };
+    } catch (_) {}
+  }
+  return p;
+};
+
+const extractImbOrderIdFromPayload = (p) => {
+  if (!p || typeof p !== "object") return null;
+  return (
+    p.order_id ||
+    p.orderId ||
+    p.orderID ||
+    p.merchant_order_id ||
+    p.merchantOrderId ||
+    p.moid ||
+    p.merchantOrderID ||
+    (p.data && (p.data.order_id || p.data.orderId)) ||
+    null
+  );
+};
+
+const imbCallbackIndicatesFailure = (p) => {
+  if (!p || typeof p !== "object") return false;
+  const msg = String(
+    p.message || p.msg || p.response_message || p.responseMessage || ""
+  ).toLowerCase();
+  if (
+    /\btransaction failed\b|\bpayment failed\b|\bfailed\b|\bfailure\b|\brejected\b|\bcancelled\b|\bcanceled\b|\bdeclined\b|\btimeout\b/i.test(
+      msg
+    )
+  ) {
+    if (/\b(success|paid|completed)\b/i.test(msg)) return false;
+    return true;
+  }
+  const st = String(
+    getProviderOrderStatus(p) || p.status || p.txStatus || ""
+  ).toUpperCase();
+  if (
+    ["FAILED", "FAILURE", "REJECTED", "CANCELLED", "CANCELED", "ERROR"].includes(
+      st
+    )
+  ) {
+    return true;
+  }
+  if (p.success === false || p.success === 0 || String(p.success) === "0") {
+    return true;
+  }
+  return false;
+};
+
+const imbCallbackIndicatesSuccess = (p) => {
+  if (!p || typeof p !== "object") return false;
+  if (imbCallbackIndicatesFailure(p)) return false;
+  if (
+    isProviderSuccessStatus(getProviderOrderStatus(p)) ||
+    isProviderSuccessStatus(p.status) ||
+    isProviderSuccessStatus(p.txStatus) ||
+    isProviderSuccessStatus(p.cod)
+  ) {
+    return true;
+  }
+  if (inferImbPaymentSuccess(p)) return true;
+  const msg = String(p.message || p.msg || "").toLowerCase();
+  if (
+    /\b(success|successful|paid|completed|captured)\b/i.test(msg) &&
+    !/\bfail/i.test(msg)
+  ) {
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Webhook: use IMB callback body first (status), then fallback to check-order API.
+ */
+const applyImbWebhookToOrder = async (orderDoc, rawPayload, reqBody) => {
+  const normalized = normalizeImbPayload(rawPayload);
+
+  if (imbCallbackIndicatesFailure(normalized)) {
+    const failMsg = String(
+      normalized.message ||
+        normalized.msg ||
+        normalized.response_message ||
+        "FAILED"
+    ).slice(0, 500);
+    await imbOrderModal.updateOne(
+      { _id: orderDoc._id },
+      {
+        $set: {
+          status: "FAILED",
+          payment_status: failMsg,
+          last_response: normalized,
+          updated_at: new Date(),
+        },
+      }
+    );
+    return {
+      order_id: String(orderDoc.order_id),
+      status: "FAILED",
+      is_success: false,
+      ledger_message: null,
+      credit_after: null,
+      wallet_total: null,
+      provider_message: failMsg,
+      provider_data: normalized,
+      source: "webhook_callback",
+    };
+  }
+
+  if (imbCallbackIndicatesSuccess(normalized)) {
+    const responseData = normalized;
+    const providerStatus =
+      getProviderOrderStatus(responseData) || "SUCCESS";
+    const refId =
+      responseData.referenceId ||
+      responseData.transaction_id ||
+      responseData.txn_id ||
+      responseData.utr ||
+      responseData.UTR ||
+      responseData.upi_txn_id ||
+      orderDoc.reference_id ||
+      orderDoc.order_id;
+
+    await imbOrderModal.updateOne(
+      { _id: orderDoc._id },
+      {
+        $set: {
+          payment_status: String(providerStatus),
+          status: "PAID",
+          reference_id: refId,
+          last_response: normalized,
+          updated_at: new Date(),
+        },
+      }
+    );
+
+    let ledgerMessage = null;
+    let credit_after = null;
+    let wallet_total = null;
+    const user = await User.findOne({
+      user_id: orderDoc.user_id,
+      app_id: orderDoc.app_id,
+    });
+    if (user) {
+      const ledger = await createDepositLedgerEntry({
+        appId: orderDoc.app_id,
+        userId: orderDoc.user_id,
+        userCredit: user.toJSON().credit,
+        orderAmount: Number(orderDoc.amount),
+        referenceId: refId,
+        devName: (reqBody || {}).devName || "WEB",
+        devType: (reqBody || {}).devType || "web",
+        devId: (reqBody || {}).devId || "WEB",
+        txMsg: responseData.message || "Payment verified (webhook).",
+        remark: "IMB_WEBHOOK",
+        paymentMode: responseData.payment_mode || "Online",
+        upiId: responseData.upiID || responseData.upi_id || null,
+      });
+      ledgerMessage = ledger.alreadyProcessed
+        ? "Transaction already processed."
+        : "Wallet credited successfully.";
+      credit_after = ledger.credit_after;
+      wallet_total = ledger.wallet_total;
+    }
+
+    return {
+      order_id: String(orderDoc.order_id),
+      status: providerStatus,
+      is_success: true,
+      ledger_message: ledgerMessage,
+      credit_after,
+      wallet_total,
+      provider_message: responseData.message || null,
+      provider_data: normalized,
+      source: "webhook_callback",
+    };
+  }
+
+  return syncImbOrderFromProvider({
+    orderDoc,
+    reqBody: reqBody || normalized,
+    payloadSnapshot: normalized,
+  });
 };
 
 const createDepositLedgerEntry = async ({
@@ -1016,9 +1489,15 @@ const createDepositLedgerEntry = async ({
     transaction_id: referenceId,
   });
   if (existingDeposit) {
+    const u = await User.findOne({ user_id: userId, app_id: appId });
+    const walletTotal = u
+      ? parseInt(u.credit || 0) + parseInt(u.win_amount || 0)
+      : null;
     return {
       alreadyProcessed: true,
       updatedBalance: existingDeposit.tr_value_updated,
+      credit_after: u ? u.credit : null,
+      wallet_total: walletTotal,
     };
   }
 
@@ -1043,7 +1522,7 @@ const createDepositLedgerEntry = async ({
     date: currentdate,
     date_time: currentdateTime,
     tr_remark: remark || "Online",
-    tr_status: "Pending",
+    tr_status: "Success",
     is_deleted: "0",
     device_type: devType || "web",
     device_id: devId || "WEB",
@@ -1062,16 +1541,31 @@ const createDepositLedgerEntry = async ({
     tr_value_updated: updatedBalance,
     date: currentdate,
     date_time: currentdateTime,
-    tr_status: "Pending",
+    tr_status: "Success",
     tr_remark: remark || "Online",
   });
 
   await pointstore11.save();
   await wallettore11.save();
 
+  const amt = parseInt(orderAmount || 0);
+  if (amt > 0) {
+    await User.updateOne(
+      { user_id: userId, app_id: appId },
+      { $inc: { credit: amt } }
+    );
+  }
+
+  const userAfter = await User.findOne({ user_id: userId, app_id: appId });
+  const walletTotal = userAfter
+    ? parseInt(userAfter.credit || 0) + parseInt(userAfter.win_amount || 0)
+    : updatedBalance;
+
   return {
     alreadyProcessed: false,
     updatedBalance,
+    credit_after: userAfter ? userAfter.credit : updatedBalance,
+    wallet_total: walletTotal,
     message: txMsg || "Deposit request created.",
     paymentMode: paymentMode || "Online",
     upiId: upiId || null,
@@ -1083,9 +1577,8 @@ const syncImbOrderFromProvider = async ({
   reqBody = {},
   payloadSnapshot = null,
 }) => {
-  const orderId = String(orderDoc.order_id || "");
-  const userToken = orderDoc.user_token;
-  if (!orderId || !userToken) {
+  const orderId = String(orderDoc.order_id || ""); 
+  if (!orderId) {
     await imbOrderModal.updateOne(
       { _id: orderDoc._id },
       {
@@ -1102,26 +1595,20 @@ const syncImbOrderFromProvider = async ({
       status: "TOKEN_MISSING",
       is_success: false,
       ledger_message: null,
+      source: "check_order_api",
     };
   }
 
-  const providerResponse = await axios.post(
-    `${IMB_BASE_URL}${IMB_CHECK_ORDER_PATH}`,
-    querystring.stringify({
-      user_token: userToken,
-      order_id: orderId,
-    }),
-    {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-      },
-      timeout: 20000,
-    }
-  );
+  const providerResponse = await fetchImbCheckOrderStatus({
+    user_token: orderDoc.user_token || IMB_USER_TOKEN,
+    order_id: orderId,
+  });
 
   const responseData = providerResponse?.data || {};
   const providerStatus = getProviderOrderStatus(responseData);
-  const isSuccess = isProviderSuccessStatus(providerStatus);
+  const isSuccess =
+    isProviderSuccessStatus(providerStatus) ||
+    inferImbPaymentSuccess(responseData);
   const refId =
     responseData?.referenceId ||
     responseData?.transaction_id ||
@@ -1143,6 +1630,8 @@ const syncImbOrderFromProvider = async ({
   );
 
   let ledgerMessage = null;
+  let credit_after = null;
+  let wallet_total = null;
   if (isSuccess) {
     const user = await User.findOne({
       user_id: orderDoc.user_id,
@@ -1165,7 +1654,9 @@ const syncImbOrderFromProvider = async ({
       });
       ledgerMessage = ledger.alreadyProcessed
         ? "Transaction already processed."
-        : "Deposit entry created.";
+        : "Wallet credited successfully.";
+      credit_after = ledger.credit_after;
+      wallet_total = ledger.wallet_total;
     }
   }
 
@@ -1174,8 +1665,152 @@ const syncImbOrderFromProvider = async ({
     status: providerStatus || "UNKNOWN",
     is_success: isSuccess,
     ledger_message: ledgerMessage,
+    credit_after,
+    wallet_total,
+    provider_message: responseData?.message || null,
     provider_data: responseData,
+    source: "check_order_api",
   };
+};
+
+/** Bina order_id — DB se pending (optional: failed) orders utha kar IMB check-order se sync */
+const runImbPendingOrdersSync = async ({
+  limit = 500,
+  reqBody = {},
+  app_id = null,
+  include_failed = false,
+}) => {
+  const cap = Math.min(Math.max(parseInt(limit, 10) || 500, 1), 5000);
+  const statusList = include_failed
+    ? ["CREATED", "PENDING", "FAILED"]
+    : ["CREATED", "PENDING"];
+  const q = { status: { $in: statusList } };
+  if (app_id && String(app_id).trim() !== "") {
+    q.app_id = String(app_id).trim();
+  }
+  const pendingOrders = await imbOrderModal
+    .find(q)
+    .sort({ updated_at: 1, created_at: 1 })
+    .limit(cap);
+
+  const results = [];
+  for (const orderDoc of pendingOrders) {
+    try {
+      const result = await syncImbOrderFromProvider({
+        orderDoc,
+        reqBody,
+        payloadSnapshot: reqBody,
+      });
+      results.push({
+        order_id: result.order_id,
+        status: result.status,
+        is_success: result.is_success,
+        ledger_message: result.ledger_message,
+        credit_after: result.credit_after,
+        wallet_total: result.wallet_total,
+        provider_message: result.provider_message,
+        source: result.source,
+      });
+    } catch (syncErr) {
+      results.push({
+        order_id: String(orderDoc.order_id),
+        status: "ERROR",
+        is_success: false,
+        error: syncErr.message,
+      });
+    }
+  }
+
+  return {
+    synced_count: results.length,
+    scanned: pendingOrders.length,
+    results,
+  };
+};
+
+exports.imb_list_orders = async (req, res) => {
+  try {
+    const { error, value } = schemaImbListOrders.validate(req.body || {}, {
+      stripUnknown: true,
+      convert: true,
+    });
+    if (error) {
+      return res.status(400).json({ success: "0", message: error.message });
+    }
+
+    const page = value.page || 1;
+    const pageSize = Math.min(value.page_size || 100, 500);
+    const query = {};
+    if (value.app_id && String(value.app_id).trim() !== "") {
+      query.app_id = String(value.app_id).trim();
+    }
+    if (value.status && String(value.status).toLowerCase() !== "all") {
+      query.status = String(value.status).trim();
+    }
+
+    const skip = (page - 1) * pageSize;
+    const [rows, total] = await Promise.all([
+      imbOrderModal
+        .find(query)
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .select(
+          "order_id user_id user_temp_id app_id amount status payment_status reference_id payment_url created_at updated_at"
+        )
+        .lean(),
+      imbOrderModal.countDocuments(query),
+    ]);
+
+    return res.status(200).json({
+      success: "1",
+      total,
+      page,
+      page_size: pageSize,
+      data: rows,
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: "0",
+      message: e.message || "Unable to list orders.",
+    });
+  }
+};
+
+exports.imb_sync_pending_orders = async (req, res) => {
+  try {
+    const { error, value } = schemaImbSyncPending.validate(
+      coerceImbSyncPendingBody(req.body || {}),
+      {
+        stripUnknown: true,
+        convert: true,
+      }
+    );
+    if (error) {
+      return res.status(400).json({ success: "0", message: error.message });
+    }
+
+    const limit = value.sync_all ? 5000 : value.limit || 500;
+    const out = await runImbPendingOrdersSync({
+      limit,
+      reqBody: req.body || {},
+      app_id: value.app_id || null,
+      include_failed: value.include_failed === true,
+    });
+
+    return res.status(200).json({
+      success: "1",
+      message: "Pending order sync completed.",
+      limit_used: Math.min(Math.max(parseInt(limit, 10) || 500, 1), 5000),
+      include_failed: value.include_failed === true,
+      ...out,
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: "0",
+      message: e.message || "Unable to sync pending orders.",
+    });
+  }
 };
 
 exports.deduct_user_balance = async (req, res) => {
@@ -1245,7 +1880,9 @@ exports.deduct_user_balance = async (req, res) => {
 
 exports.create_imb_order = async (req, res) => {
   try {
-    const validation = schemaCreateImbOrder.validate(req.body);
+    const validation = schemaCreateImbOrder.validate(req.body || {}, {
+      convert: true,
+    });
     if (validation.error) {
       return res.status(400).json({ success: "0", message: validation.error.message });
     }
@@ -1259,6 +1896,31 @@ exports.create_imb_order = async (req, res) => {
       return res
         .status(404)
         .json({ success: "0", message: "User Not Available Or Blocked" });
+    }
+
+    const userJson = user.toJSON();
+    let userTempId =
+      req.body.user_temp_id && String(req.body.user_temp_id).trim() !== ""
+        ? String(req.body.user_temp_id).trim()
+        : null;
+    const userMob = String(
+      req.body.customer_mobile || userJson.mob || ""
+    ).trim();
+
+    if (!userTempId && userMob) {
+      const utByMob = await userTempModal.findOne({ mob: userMob });
+      if (utByMob) {
+        userTempId = String(utByMob._id);
+      }
+    } else if (userTempId) {
+      if (!mongoose.Types.ObjectId.isValid(userTempId)) {
+        userTempId = null;
+      } else {
+        const utById = await userTempModal.findById(userTempId);
+        if (!utById) {
+          userTempId = null;
+        }
+      }
     }
 
     const generatedOrderId =
@@ -1304,6 +1966,7 @@ exports.create_imb_order = async (req, res) => {
         $set: {
           order_id: generatedOrderId,
           user_id: req.body.user_id,
+          user_temp_id: userTempId,
           app_id: req.body.app_id,
           amount: Number(req.body.amount),
           user_token: IMB_USER_TOKEN,
@@ -1321,10 +1984,25 @@ exports.create_imb_order = async (req, res) => {
       { upsert: true }
     );
 
+    if (userTempId) {
+      await userTempModal.updateOne(
+        { _id: userTempId },
+        {
+          $set: {
+            user_id: req.body.user_id,
+            imb_last_order_id: generatedOrderId,
+            updated_at: new Date(),
+          },
+        }
+      );
+    }
+
     return res.status(200).json({
       success: "1",
       message: responseData?.message || "Order created successfully.",
       order_id: generatedOrderId,
+      user_id: req.body.user_id,
+      user_temp_id: userTempId,
       webhook_url: webhookUrl,
       ...responseData,
     });
@@ -1343,55 +2021,68 @@ exports.create_imb_order = async (req, res) => {
 
 exports.check_imb_order_status = async (req, res) => {
   try {
-    const validation = schemaImbOrderStatus.validate(req.body);
+    const order_id = normalizeImbOrderId(req.body.order_id);
+    if (!order_id) {
+      return res.status(400).json({
+        success: "0",
+        message:
+          "Invalid order_id. Use the string returned from create-order (e.g. res.order_id). Do not pass an object — use String(orderId) or orderId?.order_id.",
+      });
+    }
+
+    const validation = schemaImbOrderStatus.validate(
+      {
+        ...req.body,
+        order_id,
+      },
+      { convert: true }
+    );
     if (validation.error) {
       return res.status(400).json({ success: "0", message: validation.error.message });
     }
 
-    const localOrder = await imbOrderModal.findOne({ order_id: req.body.order_id });
-    const payload = {
-      user_token: IMB_USER_TOKEN,
-      order_id: req.body.order_id,
-    };
-
-    const response = await axios.post(
-      `${IMB_BASE_URL}${IMB_CHECK_ORDER_PATH}`,
-      querystring.stringify(payload),
-      {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-        },
-        timeout: 20000,
-      }
-    );
-
-    const responseData = response?.data || {};
-    const providerStatus = getProviderOrderStatus(responseData);
-    const isSuccess = isProviderSuccessStatus(providerStatus);
+    const localOrder = await imbOrderModal.findOne({ order_id });
 
     if (localOrder) {
       const syncResult = await syncImbOrderFromProvider({
         orderDoc: localOrder,
         reqBody: req.body,
       });
+      const pdata = syncResult.provider_data || {};
       return res.status(200).json({
         success: "1",
-        message: responseData?.message || "Status fetched",
-        order_id: req.body.order_id,
+        message: pdata?.message || "Status fetched",
+        order_id,
         status: syncResult.status,
         is_success: syncResult.is_success,
         ledger_message: syncResult.ledger_message,
-        data: responseData,
+        credit_after: syncResult.credit_after,
+        wallet_total: syncResult.wallet_total,
+        provider_message: syncResult.provider_message,
+        data: pdata,
       });
     }
+
+    const response = await fetchImbCheckOrderStatus({
+      user_token: req.body.user_token || IMB_USER_TOKEN,
+      order_id,
+    });
+    const responseData = response?.data || {};
+    const providerStatus = getProviderOrderStatus(responseData);
+    const isSuccess =
+      isProviderSuccessStatus(providerStatus) ||
+      inferImbPaymentSuccess(responseData);
 
     return res.status(200).json({
       success: "1",
       message: responseData?.message || "Status fetched",
-      order_id: req.body.order_id,
+      order_id,
       status: providerStatus || "UNKNOWN",
       is_success: isSuccess,
       ledger_message: null,
+      credit_after: null,
+      wallet_total: null,
+      provider_message: responseData?.message || null,
       data: responseData,
     });
   } catch (error) {
@@ -1407,10 +2098,57 @@ exports.check_imb_order_status = async (req, res) => {
   }
 };
 
+/** GET: browser/health check — webhook must be called with POST */
+exports.imb_payment_webhook_info = (req, res) => {
+  const base = `${req.protocol}://${req.get("host")}`;
+  return res.status(200).json({
+    success: "1",
+    message:
+      "IMB webhook & helpers: POST (JSON/form) ya GET (query) dono. Khali GET = ye help JSON.",
+    post: {
+      content_type: "application/json or application/x-www-form-urlencoded",
+      webhook_single_or_sync: `${base}/api/users/imb-payment-webhook`,
+    },
+    get_examples: {
+      webhook_help: `${base}/api/users/imb-payment-webhook`,
+      webhook_sync_pending: `${base}/api/users/imb-payment-webhook?limit=50&sync_all=true`,
+      webhook_one_order: `${base}/api/users/imb-payment-webhook?order_id=ORDER_ID_HERE`,
+      list_orders: `${base}/api/users/imb-list-orders?page=1&page_size=100`,
+      sync_pending: `${base}/api/users/imb-sync-pending-orders?sync_all=true`,
+      check_status: `${base}/api/users/imb-check-order-status?order_id=ORDER_ID_HERE`,
+      create_order:
+        `${base}/api/users/imb-create-order?user_id=UID&app_id=APP&amount=100`,
+    },
+    public_imb_api: {
+      webhook_get: `${base}/imb-api/api/webhook`,
+      webhook_post: `${base}/imb-api/api/webhook`,
+      create_get: `${base}/imb-api/api/create-order`,
+      create_post: `${base}/imb-api/api/create-order`,
+      check_get: `${base}/imb-api/api/check-order-status`,
+      check_post: `${base}/imb-api/api/check-order-status`,
+      list_get: `${base}/imb-api/api/list-orders`,
+      sync_get: `${base}/imb-api/api/sync-pending-orders`,
+    },
+  });
+};
+
 exports.imb_payment_webhook = async (req, res) => {
   try {
-    const payload = req.body || {};
-    const orderId = payload.order_id || payload.orderId;
+    const q = req.query && typeof req.query === "object" ? req.query : {};
+    let merged = { ...q };
+    if (req.body != null) {
+      if (typeof req.body === "string") {
+        try {
+          Object.assign(merged, JSON.parse(req.body));
+        } catch {
+          merged._raw_body = req.body;
+        }
+      } else if (typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
+        Object.assign(merged, req.body);
+      }
+    }
+    const payload = normalizeImbPayload(merged);
+    const orderId = extractImbOrderIdFromPayload(payload);
     if (orderId) {
       const localOrder = await imbOrderModal.findOne({ order_id: String(orderId) });
       if (!localOrder) {
@@ -1421,11 +2159,7 @@ exports.imb_payment_webhook = async (req, res) => {
         });
       }
 
-      const result = await syncImbOrderFromProvider({
-        orderDoc: localOrder,
-        reqBody: payload,
-        payloadSnapshot: payload,
-      });
+      const result = await applyImbWebhookToOrder(localOrder, payload, payload);
 
       return res.status(200).json({
         success: "1",
@@ -1434,55 +2168,39 @@ exports.imb_payment_webhook = async (req, res) => {
         status: result.status,
         is_success: result.is_success,
         ledger_message: result.ledger_message,
+        credit_after: result.credit_after,
+        wallet_total: result.wallet_total,
+        provider_message: result.provider_message,
+        source: result.source,
       });
     }
 
-    const syncLimit = Math.max(
-      1,
-      Math.min(parseInt(payload.limit || 20), 100)
-    );
-    const pendingOrders = await imbOrderModal
-      .find({ status: { $in: ["CREATED", "PENDING"] } })
-      .sort({ updated_at: 1, created_at: 1 })
-      .limit(syncLimit);
+    const syncLimit = payload.sync_all
+      ? 5000
+      : Math.max(1, Math.min(parseInt(payload.limit || 20, 10), 5000));
+    const syncOut = await runImbPendingOrdersSync({
+      limit: syncLimit,
+      reqBody: payload,
+      app_id: payload.app_id || null,
+    });
 
-    if (!pendingOrders.length) {
+    if (!syncOut.scanned) {
       return res.status(200).json({
         success: "1",
         message: "No pending orders found for sync.",
         synced_count: 0,
+        scanned: 0,
+        results: [],
       });
-    }
-
-    const results = [];
-    for (const orderDoc of pendingOrders) {
-      try {
-        const result = await syncImbOrderFromProvider({
-          orderDoc,
-          reqBody: payload,
-          payloadSnapshot: payload,
-        });
-        results.push({
-          order_id: result.order_id,
-          status: result.status,
-          is_success: result.is_success,
-          ledger_message: result.ledger_message,
-        });
-      } catch (syncErr) {
-        results.push({
-          order_id: String(orderDoc.order_id),
-          status: "ERROR",
-          is_success: false,
-          error: syncErr.message,
-        });
-      }
     }
 
     return res.status(200).json({
       success: "1",
       message: "Pending order sync completed.",
-      synced_count: results.length,
-      results,
+      limit_used: syncLimit,
+      synced_count: syncOut.synced_count,
+      scanned: syncOut.scanned,
+      results: syncOut.results,
     });
   } catch (error) {
     return res.status(500).json({
@@ -1491,62 +2209,236 @@ exports.imb_payment_webhook = async (req, res) => {
     });
   }
 };
-exports.app_manager = async (req, res) => {
-  try {
-    const result = schemaapp_manager.validate(req.body);
 
-    if (result.error) {
-      return res.status(200).json({ message: result.error.message });
+const normalizeImbQueryFlags = (q) => {
+  const o = { ...(q || {}) };
+  if (o.sync_all === "true" || o.sync_all === "1") o.sync_all = true;
+  if (o.sync_all === "false" || o.sync_all === "0") o.sync_all = false;
+  return o;
+};
+
+const IMB_GET_WEBHOOK_ACTION_KEYS = [
+  "order_id",
+  "orderId",
+  "orderID",
+  "merchant_order_id",
+  "merchantOrderId",
+  "moid",
+  "limit",
+  "sync_all",
+  "app_id",
+];
+
+/** GET: bina body — query se webhook / pending sync (browser / curl GET) */
+exports.imb_payment_webhook_get = async (req, res) => {
+  const rawQ = req.query || {};
+  const hasAction = IMB_GET_WEBHOOK_ACTION_KEYS.some(
+    (k) => rawQ[k] != null && String(rawQ[k]).trim() !== ""
+  );
+  if (!hasAction) {
+    return exports.imb_payment_webhook_info(req, res);
+  }
+  req.body = normalizeImbQueryFlags(rawQ);
+  return exports.imb_payment_webhook(req, res);
+};
+
+exports.imb_list_orders_get = (req, res) => {
+  req.body = normalizeImbQueryFlags(req.query || {});
+  return exports.imb_list_orders(req, res);
+};
+
+exports.imb_sync_pending_orders_get = (req, res) => {
+  req.body = normalizeImbQueryFlags(req.query || {});
+  return exports.imb_sync_pending_orders(req, res);
+};
+
+/**
+ * GET-only webhook: pending + FAILED orders ko IMB se verify karke status update;
+ * PAID par user wallet credit (same ledger flow as sync).
+ * Optional: set env IMB_GET_SYNC_WEBHOOK_KEY — then require ?key=... on every call.
+ */
+exports.imb_get_payment_sync_webhook = async (req, res) => {
+  try {
+    const envKey = process.env.IMB_GET_SYNC_WEBHOOK_KEY;
+    if (envKey != null && String(envKey).trim() !== "") {
+      const qKey = req.query && req.query.key;
+      if (String(qKey || "") !== String(envKey)) {
+        return res.status(403).json({
+          success: "0",
+          message: "Forbidden: invalid or missing key query param.",
+        });
+      }
     }
 
+    const merged = coerceImbSyncPendingBody({ ...(req.query || {}) });
+    const { error, value } = schemaImbSyncPending.validate(merged, {
+      stripUnknown: true,
+      convert: true,
+    });
+    if (error) {
+      return res.status(400).json({ success: "0", message: error.message });
+    }
+
+    const limit = value.sync_all ? 5000 : value.limit || 500;
+    const out = await runImbPendingOrdersSync({
+      limit,
+      reqBody: merged,
+      app_id: value.app_id || null,
+      include_failed: true,
+    });
+
+    return res.status(200).json({
+      success: "1",
+      message:
+        "GET sync webhook: CREATED/PENDING/FAILED orders checked with IMB; wallet credited if paid.",
+      include_failed: true,
+      limit_used: Math.min(Math.max(parseInt(limit, 10) || 500, 1), 5000),
+      ...out,
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: "0",
+      message: e.message || "GET sync webhook failed.",
+    });
+  }
+};
+
+exports.imb_check_order_status_get = (req, res) => {
+  req.body = { ...(req.query || {}) };
+  return exports.check_imb_order_status(req, res);
+};
+
+exports.all_game_results_by_month_get = (req, res) => {
+  req.body = { ...(req.query || {}) };
+  return exports.all_game_results_by_month(req, res);
+};
+
+exports.imb_create_order_get = (req, res) => {
+  req.body = normalizeImbQueryFlags(req.query || {});
+  return exports.create_imb_order(req, res);
+};
+
+// exports.app_manager = async (req, res) => {
+//   try {
+//     const result = schemaapp_manager.validate(req.body);
+
+//     if (result.error) {
+//       return res.status(200).json({ message: result.error.message });
+//     }
+
+//     const user = await User.findOne({
+//       user_id: req.body.user_id,
+//       app_id: req.body.app_id,
+//       user_status: "1",
+//     });
+
+//     if (!user) {
+//       return res
+//         .status(200)
+//         .send({ status: "0", message: "User Not Available Or Blocked" });
+//     }
+
+//     const appController = await appControllerModal.findOne({
+//       app_id: req.body.app_id,
+//     });
+
+
+//     // Proceed with payment_setting lookup after sending response
+//     const sqlQuery = {
+//       status: "1",
+//       app_id: req.body.app_id,
+//     };
+
+//     const payment_setting = await payment_settingModal
+//       .findOne(sqlQuery)
+//       .select("getaway")
+//       .limit(1);
+
+//     if (!payment_setting) {
+//       console.log("Data Not Exists");
+//       return;
+//     }
+
+//     var gv = payment_setting.toJSON().getaway;
+
+
+//     const rows = {
+//       success: "1",
+//       message: "Balance Fetched Successfully",
+//       logout: "0",
+//       crossingmin: 5,
+//       data: {appController,payment_getway:gv},
+//     };
+
+//     res.status(200).send(rows); // Response is sent here, make sure no further response is sent.
+
+
+
+
+//   } catch (error) {
+//     console.error("Error:", error);
+//     res.status(500).json({ error: error.message });
+//   }
+// };
+
+
+exports.app_manager = async (req, res) => {
+  try {
+    const { error } = schemaapp_manager.validate(req.body);
+
+    if (error) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    const { user_id, app_id } = req.body;
+
     const user = await User.findOne({
-      user_id: req.body.user_id,
-      app_id: req.body.app_id,
+      user_id,
+      app_id,
       user_status: "1",
     });
 
     if (!user) {
-      return res
-        .status(200)
-        .send({ status: "0", message: "User Not Available Or Blocked" });
+      return res.status(200).json({
+        status: "0",
+        message: "User Not Available Or Blocked",
+      });
     }
 
-    const appController = await appControllerModal.findOne({
-      app_id: req.body.app_id,
+    const [appController, payment_settingByApp] = await Promise.all([
+      appControllerModal.findOne({ app_id }),
+      payment_settingModal.findOne({ status: "1"})
+    ]);
+
+     
+
+    // const gateway = payment_settingByApp
+    //   .map((p) => p?.getaway)
+    //   .filter((value) => value !== undefined && value !== null && value !== "");
+ 
+
+    return res.status(200).json({
+      success: "1",
+      message: "App Data Fetched Successfully",
+      logout: "0",
+      crossingmin: appController?.crossingMin || 0,
+      data: {
+        appController: appController || {},
+        gateway:payment_settingByApp
+      },
     });
 
-    const rows = {
-      success: "1",
-      message: "Balance Fetched Successfully",
-      logout: "0",
-      crossingmin: 5,
-      data: appController,
-    };
-
-    res.status(200).send(rows); // Response is sent here, make sure no further response is sent.
-
-    // Proceed with payment_setting lookup after sending response
-    const sqlQuery = {
-      status: "1",
-      app_id: req.body.app_id,
-    };
-
-    const payment_setting = await payment_settingModal
-      .findOne(sqlQuery)
-      .select("getaway")
-      .limit(1);
-
-    if (!payment_setting) {
-      console.log("Data Not Exists");
-      return;
-    }
-
-    var gv = payment_setting.toJSON().getaway;
   } catch (error) {
     console.error("Error:", error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      success: "0",
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
+
+
 
 // exports.app_manager = async (req, res) => {
 

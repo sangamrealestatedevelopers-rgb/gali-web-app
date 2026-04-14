@@ -52,6 +52,8 @@ module.exports = (app) => {
   router.post("/result-links", home.resultLink);
   router.post("/transfer", home.transfer_store);
   router.post("/single-market-result", home.single_market_result);
+  router.post("/all-game-results-by-month", home.all_game_results_by_month);
+  router.get("/all-game-results-by-month", home.all_game_results_by_month_get);
   router.post("/deduct-user-balance", home.deduct_user_balance);
   router.post("/app-manager", home.app_manager);
   router.post("/add-account", home.add_account);
@@ -59,7 +61,16 @@ module.exports = (app) => {
   router.post("/deduct-withdrawweb", home.deduct_withdrawweb);
   router.post("/deduct-withdrawUpiweb", home.deduct_withdrawUpiweb);
   router.post("/imb-create-order", home.create_imb_order);
+  router.get("/imb-create-order", home.imb_create_order_get);
   router.post("/imb-check-order-status", home.check_imb_order_status);
+  router.get("/imb-check-order-status", home.imb_check_order_status_get);
+  router.post("/imb-list-orders", home.imb_list_orders);
+  router.get("/imb-list-orders", home.imb_list_orders_get);
+  router.post("/imb-sync-pending-orders", home.imb_sync_pending_orders);
+  router.get("/imb-sync-pending-orders", home.imb_sync_pending_orders_get);
+  /** GET-only: pending + failed → IMB check → status + wallet credit if paid */
+  router.get("/imb-get-sync-webhook", home.imb_get_payment_sync_webhook);
+  router.get("/imb-payment-webhook", home.imb_payment_webhook_get);
   router.post("/imb-payment-webhook", home.imb_payment_webhook);
   router.post("/add-bank-account", home.add_bank_account);
   router.post("/get-all-bank-account", home.get_bank_accountAll);
@@ -74,7 +85,13 @@ module.exports = (app) => {
   // router.post("/web-Audio", chatStore.web_Audio);
 
   app.post("/imb-api/api/create-order", home.create_imb_order);
+  app.get("/imb-api/api/create-order", home.imb_create_order_get);
   app.post("/imb-api/api/check-order-status", home.check_imb_order_status);
+  app.get("/imb-api/api/check-order-status", home.imb_check_order_status_get);
+  app.get("/imb-api/api/list-orders", home.imb_list_orders_get);
+  app.get("/imb-api/api/sync-pending-orders", home.imb_sync_pending_orders_get);
+  app.get("/imb-api/api/get-sync-webhook", home.imb_get_payment_sync_webhook);
+  app.get("/imb-api/api/webhook", home.imb_payment_webhook_get);
   app.post("/imb-api/api/webhook", home.imb_payment_webhook);
 
   app.use("/api/users", router);
