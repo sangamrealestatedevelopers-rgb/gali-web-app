@@ -1,0 +1,263 @@
+.history-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #eef4ff 0%, #e5efff 100%);
+  padding-top: 76px;
+  padding-bottom: 72px;
+}
+
+.history-topbar {
+  height: 76px;
+  background: #0b5ed7;
+  color: #fff;
+  display: grid;
+  grid-template-columns: 42px 24px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 8;
+}
+
+.history-icon-btn {
+  border: none;
+  background: transparent;
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.history-icon-btn .app-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.history-bell {
+  border: none;
+  background: transparent;
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.history-bell .app-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.history-logo {
+  width: 62px;
+  height: 62px;
+  object-fit: cover;
+  justify-self: center;
+}
+
+.history-balance-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.history-coin {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #dbeafe;
+  color: #0b5ed7;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+
+.history-balance-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.history-balance-text small {
+  font-size: 12px;
+}
+
+.history-balance-text strong {
+  font-size: 28px;
+  color: #ffffff;
+}
+
+.history-title {
+  margin-top: 8px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  background: #084298;
+  color: #fff;
+  font-size: 24px;
+}
+
+.history-content {
+  padding: 8px 4px;
+}
+
+.market-filter {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.market-filter select,
+.market-filter button {
+  border: 1px solid #9dc3ff;
+  border-radius: 8px;
+  height: 58px;
+  font-size: 18px;
+  background: #ffffff;
+  padding: 0 10px;
+  color: #0c2a57;
+}
+
+.market-filter button {
+  min-width: 110px;
+  background: #0b5ed7;
+  color: #fff;
+}
+
+.tab-info-wrap {
+  border: 1px solid #c7dcff;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  background: #ffffff;
+}
+
+.history-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.history-tabs button {
+  border: none;
+  height: 46px;
+  background: #0b5ed7;
+  color: #fff;
+  font-size: 18px;
+  border-right: 1px solid #fff;
+}
+
+.history-tabs button:last-child {
+  border-right: none;
+}
+
+.history-tabs button.active {
+  opacity: 0.92;
+}
+
+.history-tab-note {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.history-tab-note p {
+  margin: 0;
+  padding: 8px 6px;
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  background: #f5f9ff;
+  border-right: 1px solid #c7dcff;
+  color: #0c2a57;
+}
+
+.history-tab-note p:last-child {
+  border-right: none;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-wrap th,
+.table-wrap td {
+  border: 1px solid #c7dcff;
+  padding: 6px 8px;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.table-wrap th {
+  background: #0b5ed7;
+  color: #fff;
+}
+
+.table-wrap td {
+  background: #ffffff;
+  font-weight: 600;
+  color: #0c2a57;
+}
+
+.empty-row {
+  text-align: center;
+}
+
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 70px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: #0b5ed7;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.nav-item {
+  border: none;
+  color: #d9d9d9;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.nav-item.active {
+  color: #111;
+  background: #f7f7f7;
+  border-radius: 8px;
+  margin: 4px;
+}
+
+@media (max-width: 768px) {
+  .history-balance-text strong {
+    font-size: 14px;
+  }
+
+  .history-title {
+    font-size: 34px;
+  }
+
+  .market-filter select,
+  .market-filter button {
+    height: 44px;
+    font-size: 14px;
+  }
+
+  .history-tabs button {
+    height: 38px;
+    font-size: 12px;
+  }
+
+  .history-tab-note p {
+    font-size: 8px;
+  }
+}
