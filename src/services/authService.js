@@ -69,31 +69,17 @@ export async function loginUser({ mobileNum, pss }) {
   return { session, message: data.message || 'Login successful.' }
 }
 
-export async function registerStep1({ name, mobileNum, pss }) {
-  const { data } = await postJson(API_ENDPOINTS.registerStep1, {
+/**
+ * Creates account in one step via POST /register-step1 (no OTP).
+ */
+export async function registerAccount({ name, mobileNum, pss, refercode = '' }) {
+  const { ok, data } = await postJson(API_ENDPOINTS.registerStep1, {
     name: name.trim(),
     pss,
     mobileNum: mobileNum.trim(),
+    refercode: String(refercode || '').trim(),
     lat: '0',
     lng: '0',
-    dev_id: APP_CONFIG.devId,
-    app_id: APP_CONFIG.appId,
-  })
-
-  if (!isApiSuccess(data.success)) {
-    throw new Error(data.message || 'Could not send OTP.')
-  }
-
-  return data.message || 'OTP sent successfully.'
-}
-
-export async function registerUser({ name, mobileNum, pss, otp, refercode }) {
-  const { ok, data } = await postJson(API_ENDPOINTS.register, {
-    name: name.trim(),
-    pss,
-    mobileNum: mobileNum.trim(),
-    otp: otp.trim(),
-    refercode: refercode.trim(),
     dev_id: APP_CONFIG.devId,
     app_id: APP_CONFIG.appId,
   })
@@ -109,4 +95,9 @@ export async function registerUser({ name, mobileNum, pss, otp, refercode }) {
 
   saveSession(session)
   return { session, message: data.message || 'User registered successfully.' }
+}
+
+/** @deprecated Use registerAccount — OTP removed; otp is ignored */
+export async function registerUser({ name, mobileNum, pss, refercode, otp: _otp }) {
+  return registerAccount({ name, mobileNum, pss, refercode })
 }
