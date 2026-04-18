@@ -92,7 +92,7 @@ function LoginPage({ navigate }) {
             Signup Here
           </button>
         </p>
-        <div className="install-center">
+        {/* <div className="install-center">
           <button
             type="button"
             className="install-btn"
@@ -103,7 +103,7 @@ function LoginPage({ navigate }) {
             </span>
             <span>Install Application</span>
           </button>
-        </div>
+        </div> */}
 
         <p className="helpline">
           Helpline Number:{' '}
