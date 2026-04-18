@@ -117,42 +117,78 @@ function SideDrawer({
   }
 
   return (
-    <div className={`sd-overlay ${isOpen ? 'show' : ''}`} onClick={onClose}>
-      <aside className={`sd-drawer ${isOpen ? 'open' : ''}`} onClick={(event) => event.stopPropagation()}>
-        <div className="sd-head">
-          <img src={logo} alt="POD" className="sd-logo" />
-          <button type="button" className="sd-close" onClick={onClose}>
+    <div
+      className={`sd-overlay ${isOpen ? 'show' : ''}`}
+      onClick={onClose}
+      role="presentation"
+      aria-hidden={!isOpen}
+    >
+      <aside
+        className={`sd-drawer ${isOpen ? 'open' : ''}`}
+        onClick={(event) => event.stopPropagation()}
+        aria-label="Side menu"
+        aria-modal="true"
+        role="dialog"
+      >
+        <div className="sd-header">
+          <div className="sd-brand">
+            <div className="sd-logo-wrap">
+              <img src={logo} alt="" className="sd-logo" />
+            </div>
+            <span className="sd-brand-title">Menu</span>
+          </div>
+          <button type="button" className="sd-close" onClick={onClose} aria-label="Close menu">
             ✕
           </button>
         </div>
 
-        <div className="sd-profile">
-          <p>name : {resolvedName}</p>
-          <p>No : {resolvedMobile}</p>
-          <p>Refcode : {resolvedRefCode}</p>
+        <div className="sd-profile-card">
+          <div className="sd-profile-row">
+            <span className="sd-profile-label">Name</span>
+            <span className="sd-profile-value">{resolvedName}</span>
+          </div>
+          <div className="sd-profile-row">
+            <span className="sd-profile-label">Mobile</span>
+            <span className="sd-profile-value">{resolvedMobile}</span>
+          </div>
+          <div className="sd-profile-row">
+            <span className="sd-profile-label">Ref code</span>
+            <span className="sd-profile-value sd-profile-value--mono">{resolvedRefCode}</span>
+          </div>
         </div>
 
-        <div className="sd-menu">
+        <nav className="sd-menu" aria-label="Main navigation">
           {menuItems.map((item) => (
-            <button key={item.key} type="button" className="sd-item" onClick={() => onClickMenuItem(item.key)}>
-              <AppIcon name={item.icon} className="sd-item-icon" />
-              <span>{item.label}</span>
+            <button
+              key={item.key}
+              type="button"
+              className={`sd-item ${item.key === 'whatsapp' ? 'sd-item--whatsapp' : ''}`}
+              onClick={() => onClickMenuItem(item.key)}
+            >
+              <span className="sd-item-icon-wrap" aria-hidden>
+                <AppIcon
+                  name={item.key === 'whatsapp' ? 'support_agent' : item.icon}
+                  className="sd-item-icon"
+                />
+              </span>
+              <span className="sd-item-label">
+                {item.key === 'whatsapp' ? 'WhatsApp / Help' : item.label}
+                {item.key === 'whatsapp' && resolvedHelpNumber ? (
+                  <span className="sd-item-sublabel">{resolvedHelpNumber}</span>
+                ) : null}
+              </span>
             </button>
           ))}
-          <a
-            href={`https://wa.me/${resolvedHelpNumber.replace(/[^\d]/g, '')}`}
-            target="_blank"
-            rel="noreferrer"
-            className="sd-item"
-          >
-            <AppIcon name="support_agent" className="sd-item-icon" />
-            <span>Help: {resolvedHelpNumber}</span>
-          </a>
-          <button type="button" className="sd-item logout" onClick={onLogout}>
-            <AppIcon name="logout" className="sd-item-icon" />
-            <span>Logout</span>
+
+          <div className="sd-menu-divider" role="separator" />
+
+          <button type="button" className="sd-item sd-item--logout" onClick={onLogout}>
+            <span className="sd-item-icon-wrap sd-item-icon-wrap--logout" aria-hidden>
+              <AppIcon name="logout" className="sd-item-icon" />
+            </span>
+            <span className="sd-item-label">Logout</span>
           </button>
-        </div>
+        </nav>
       </aside>
     </div>
   )

@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(180deg, #0b5ed7 0%, #1976ff 100%);
+  background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary-bright) 100%);
   border-bottom-left-radius: 16px;
   border-bottom-right-radius: 16px;
   white-space: nowrap;
@@ -17,9 +17,13 @@
 
 .app-header-logo {
   order: 2;
-  width: 88px;
+  width: 56px;
+  height: 56px;
   max-width: 100%;
   flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 .app-header-icon-btn,
@@ -54,7 +58,7 @@
   min-width: 132px;
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(8, 66, 152, 0.16);
+  box-shadow: 0 4px 14px rgba(69, 10, 10, 0.12);
   gap: 8px;
   padding: 6px 8px;
 }
@@ -63,8 +67,8 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #eaf2ff;
-  color: #0b5ed7;
+  background: var(--color-soft);
+  color: var(--color-primary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -79,12 +83,12 @@
 
 .app-header-balance-text small {
   font-size: 10px;
-  color: #4d6ea7;
+  color: var(--color-text-muted);
 }
 
 .app-header-balance-text strong {
   font-size: 13px;
-  color: #0c2a57;
+  color: var(--color-text);
 }
 
 @media (max-width: 768px) {
@@ -95,7 +99,8 @@
   }
 
   .app-header-logo {
-    width: 72px;
+    width: 48px;
+    height: 48px;
   }
 
   .app-header-balance-card {

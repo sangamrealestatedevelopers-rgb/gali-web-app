@@ -8,7 +8,7 @@ import Header from '../common/Header'
 import './terms.css'
 
 const termsLines = [
-  'Playonlineds Matka HELP & SUPPORT💥',
+  'Shree Matka HELP & SUPPORT💥',
   '🔥10 Rs एकल जोड़ी भुगतान = 950 Rs🔥',
   '🔥10 Rs हुर्रफ (A.B.) भुगतान = 90 Rs🔥',
   '🔥भुगतान जमा करने का समय. 24x7🔥',

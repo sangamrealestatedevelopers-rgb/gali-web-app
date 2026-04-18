@@ -1,7 +1,7 @@
 .result-history-page {
   min-height: 100vh;
   min-height: 100dvh;
-  background: #eef4ff;
+  background: var(--color-soft);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -11,7 +11,7 @@
 .rh-topbar {
   height: 62px;
   padding: 0 12px;
-  background: #0b5ed7;
+  background: var(--color-primary);
   color: #fff;
   display: grid;
   grid-template-columns: 40px 1fr 40px;
@@ -43,7 +43,7 @@
 .rh-state {
   margin: 8px 12px;
   font-size: 13px;
-  color: #0c2a57;
+  color: var(--color-text);
 }
 
 .rh-state.error {
@@ -60,7 +60,7 @@
 .rh-controls input {
   height: 40px;
   border-radius: 8px;
-  border: 1px solid #9dc3ff;
+  border: 1px solid var(--color-border);
   padding: 0 10px;
   font-size: 14px;
 }
@@ -69,7 +69,7 @@
   height: 40px;
   border: none;
   border-radius: 8px;
-  background: #0b5ed7;
+  background: var(--color-primary);
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -95,7 +95,7 @@
 
 .rh-table th,
 .rh-table td {
-  border: 1px solid #c7dcff;
+  border: 1px solid var(--color-border-soft);
   padding: 8px 10px;
   white-space: nowrap;
   font-size: 12px;
@@ -103,7 +103,7 @@
 }
 
 .rh-table th {
-  background: #084298;
+  background: var(--color-accent-dark);
   color: #fff;
   position: sticky;
   top: 0;

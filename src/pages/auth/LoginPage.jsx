@@ -6,7 +6,7 @@ import { ROUTE_PATHS } from '../routes'
 import './auth.css'
 
 const initialLoginForm = { mobileNum: '', pss: '' }
-const APK_DOWNLOAD_URL ='https://24x7good.com/apk/7-Star-Matka.apk'
+const APK_DOWNLOAD_URL = 'https://24x7good.com/apk/Shree-Matka.apk'
 
 function LoginPage({ navigate }) {
   const [form, setForm] = useState(initialLoginForm)

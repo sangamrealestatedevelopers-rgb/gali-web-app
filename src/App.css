@@ -1,6 +1,6 @@
 .auth-page {
   min-height: 100vh;
-  background: #291f25;
+  background: var(--color-auth-page-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10,7 +10,7 @@
 
 .auth-card {
   width: min(640px, 100%);
-  background: #b0aeaf;
+  background: var(--color-auth-card);
   border-radius: 16px;
   padding: 82px 18px 26px;
   position: relative;
@@ -100,7 +100,7 @@
   font-size: 30px;
   font-weight: 700;
   color: #fff;
-  background: #2a2026;
+  background: var(--color-auth-btn);
   cursor: pointer;
 }
 
@@ -134,9 +134,9 @@
 }
 
 .install-btn {
-  border: 2px solid #225db7;
+  border: 2px solid var(--color-primary);
   border-radius: 8px;
-  background: #2a2026;
+  background: var(--color-auth-btn);
   color: #fff;
   height: 50px;
   font-size: 17px;

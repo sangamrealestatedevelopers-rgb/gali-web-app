@@ -7,9 +7,10 @@ import { getPendingBetHistory } from '../../services/historyService'
 import SideDrawer from '../common/SideDrawer'
 import AppIcon from '../common/AppIcon'
 import Header from '../common/Header'
+import { formatMarketDisplayName } from '../../utils/marketDisplayName'
 import './mygame.css'
 
-function MyGamePage({ navigate, pageTitle = 'History', initialTab = 'pending' }) {
+function MyGamePage({ navigate, pageTitle = 'My Game', initialTab = 'pending' }) {
   const [session] = useState(() => getSession())
   const [loading, setLoading] = useState(true)
   const [reloadTick, setReloadTick] = useState(0)
@@ -50,7 +51,6 @@ function MyGamePage({ navigate, pageTitle = 'History', initialTab = 'pending' })
       setLoading(true)
       setError('')
       try {
-        // Using pending-bet-history endpoint for both tabs until a dedicated declared API is provided.
         const result = await getPendingBetHistory(session.userId, selectedMarket, 1)
         setHistoryRows(result.rows)
       } catch (apiError) {
@@ -68,14 +68,17 @@ function MyGamePage({ navigate, pageTitle = 'History', initialTab = 'pending' })
   }, [initialTab])
 
   const marketOptions = useMemo(
-    () => [{ id: 'all', name: 'All Market' }, ...markets.map((item) => ({ id: item.id, name: item.name }))],
+    () => [
+      { id: 'all', name: 'All Market' },
+      ...markets.map((item) => ({ id: item.id, name: formatMarketDisplayName(item.name) })),
+    ],
     [markets]
   )
 
   if (!session?.userId) return null
 
   return (
-    <div className="history-page">
+    <div className="my-game-page">
       <Header
         credit={credit}
         isMenuOpen={drawerOpen}
@@ -83,82 +86,121 @@ function MyGamePage({ navigate, pageTitle = 'History', initialTab = 'pending' })
         onNotification={() => navigate(ROUTE_PATHS.notification)}
       />
 
-      <div className="history-title">{pageTitle}</div>
+      <header className="my-game-banner">
+        <h1 className="my-game-banner-title">{pageTitle}</h1>
+        <p className="my-game-banner-sub">Pending &amp; declared bets</p>
+      </header>
 
-      <main className="history-content">
-        <section className="market-filter">
-          <select value={selectedMarket} onChange={(event) => setSelectedMarket(event.target.value)}>
-            {marketOptions.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-          <button type="button" onClick={() => setReloadTick((prev) => prev + 1)}>
+      <main className="my-game-content">
+        <section className="my-game-toolbar" aria-label="Filters">
+          <label className="my-game-select-wrap">
+            <span className="my-game-select-label">Market</span>
+            <select
+              className="my-game-select"
+              value={selectedMarket}
+              onChange={(event) => setSelectedMarket(event.target.value)}
+            >
+              {marketOptions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="my-game-reload"
+            onClick={() => setReloadTick((prev) => prev + 1)}
+          >
+            <span className="my-game-reload-icon" aria-hidden>
+              ↻
+            </span>
             Reload
           </button>
         </section>
 
-        <section className="tab-info-wrap">
-          <div className="history-tabs">
+        <section className="my-game-tabs-card">
+          <div className="history-tabs my-game-segmented">
             <button
               type="button"
               className={activeTab === 'pending' ? 'active' : ''}
               onClick={() => setActiveTab('pending')}
             >
-              Pending Bet
+              Pending bet
             </button>
             <button
               type="button"
               className={activeTab === 'declared' ? 'active' : ''}
               onClick={() => setActiveTab('declared')}
             >
-              Declared Bet
+              Declared bet
             </button>
           </div>
-          <div className="history-tab-note">
-            <p>जिन गेम का रिजल्ट नही आया वो PENDING BET में दिखेंगी।</p>
-            <p>जिन गेम का रिजल्ट आ गया है वो DECLARED BET में दिखेंगी।</p>
+          <div className="my-game-notes">
+            <div className="my-game-note">
+              <span className="my-game-note-badge">Pending</span>
+              <p>
+                जिन गेम का रिजल्ट नहीं आया वो यहाँ दिखेंगी। Games without a result show under Pending.
+              </p>
+            </div>
+            <div className="my-game-note">
+              <span className="my-game-note-badge my-game-note-badge--declared">Declared</span>
+              <p>
+                जिन गेम का रिजल्ट आ गया है वो यहाँ दिखेंगी। Declared results show here.
+              </p>
+            </div>
           </div>
         </section>
 
-        {loading ? <p className="state-text">Loading history...</p> : null}
-        {error ? <p className="state-text error">{error}</p> : null}
+        {loading ? (
+          <div className="my-game-loading" aria-busy aria-label="Loading bets">
+            <div className="my-game-skeleton my-game-skeleton-row" />
+            <div className="my-game-skeleton my-game-skeleton-row" />
+            <div className="my-game-skeleton my-game-skeleton-row" />
+            <div className="my-game-skeleton my-game-skeleton-table" />
+          </div>
+        ) : null}
+        {error ? <p className="my-game-state my-game-state--error">{error}</p> : null}
 
         {!loading && !error ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>S.NO</th>
-                  <th>Date</th>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Number</th>
-                  <th>Points</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historyRows.map((row, index) => (
-                  <tr key={row.id}>
-                    <td>{index + 1}</td>
-                    <td>{row.datetime || row.date || '--'}</td>
-                    <td>{row.table_id || '--'}</td>
-                    <td>{row.bettype || '--'}</td>
-                    <td>{row.pred_num || '--'}</td>
-                    <td>{row.tr_value ?? '--'}</td>
-                  </tr>
-                ))}
-                {historyRows.length === 0 ? (
+          <section className="my-game-table-card">
+            <h2 className="my-game-table-heading">
+              {activeTab === 'pending' ? 'Pending bets' : 'Declared bets'}
+            </h2>
+            <div className="my-game-table-wrap table-wrap">
+              <table>
+                <thead>
                   <tr>
-                    <td colSpan={6} className="empty-row">
-                      No history found.
-                    </td>
+                    <th>S.No</th>
+                    <th>Date</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Number</th>
+                    <th>Points</th>
                   </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {historyRows.map((row, index) => (
+                    <tr key={row.id ?? `row-${index}`}>
+                      <td>{index + 1}</td>
+                      <td>{row.datetime || row.date || '—'}</td>
+                      <td>{row.table_id || '—'}</td>
+                      <td>{row.bettype || '—'}</td>
+                      <td className="my-game-num">{row.pred_num ?? '—'}</td>
+                      <td className="my-game-points">{row.tr_value ?? '—'}</td>
+                    </tr>
+                  ))}
+                  {historyRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="my-game-empty">
+                        No records for this filter.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </section>
         ) : null}
       </main>
 

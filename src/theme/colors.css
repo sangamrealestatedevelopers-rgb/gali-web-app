@@ -1,0 +1,48 @@
+/**
+ * Gali WebApp — single source for theme colors (yellow + red).
+ * Change palette only here; components use var(--token-name).
+ */
+:root {
+  /* Primary (yellow / gold) */
+  --color-primary: #f0b000;
+  --color-primary-mid: #ff9500;
+  --color-primary-bright: #ffd54a;
+
+  /* Red accents (bars, strips, dark UI) */
+  --color-accent-dark: #9f1239;
+  --color-accent-strip: #b91c1c;
+
+  /* Surfaces & page */
+  --color-body-bg: #fff8e7;
+  --color-soft: #fff3d6;
+  --color-soft-alt: #ffecd2;
+  --color-card-inner: #fffaf0;
+
+  --color-text: #450a0a;
+  --color-text-muted: #7f1d1d;
+
+  --color-white: #ffffff;
+  --color-on-primary: #1a0800;
+
+  --color-nav-muted: rgba(255, 255, 255, 0.92);
+  --color-chip-bg: #ffecb3;
+  --color-chip-text: #b45309;
+
+  --color-border: #fbbf24;
+  --color-border-soft: #fde68a;
+
+  --color-topbar-dark: #450a0a;
+
+  /* Auth screens */
+  --color-auth-page-bg: #3d0a0a;
+  --color-auth-card: #fff4c4;
+  --color-auth-btn: #991b1b;
+  --color-auth-text: #1c0a0a;
+
+  /* Legacy names (index.css global overrides) */
+  --theme-blue: var(--color-primary);
+  --theme-blue-dark: var(--color-accent-dark);
+  --theme-blue-soft: var(--color-soft);
+  --theme-white: var(--color-white);
+  --theme-text: var(--color-text);
+}

@@ -7,6 +7,7 @@ import { getSession } from '../../services/sessionService'
 import SideDrawer from '../common/SideDrawer'
 import AppIcon from '../common/AppIcon'
 import Header from '../common/Header'
+import { formatMarketDisplayName } from '../../utils/marketDisplayName'
 import './play.css'
 
 function PlayPage({ navigate }) {
@@ -77,7 +78,7 @@ function PlayPage({ navigate }) {
                   <CardContent className="game-card-content">
                     <div className="clock-box">⏰</div>
                     <div className="game-info">
-                      <h3>{market.name}</h3>
+                      <h3>{formatMarketDisplayName(market.name)}</h3>
                       <p>
                         {market.open_time} - {market.time}
                       </p>

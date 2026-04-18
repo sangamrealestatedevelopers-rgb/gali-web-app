@@ -14,6 +14,7 @@ import SideDrawer from '../common/SideDrawer'
 import MessageDialog from '../common/MessageDialog'
 import AppIcon from '../common/AppIcon'
 import Header from '../common/Header'
+import { formatMarketDisplayName } from '../../utils/marketDisplayName'
 import './wallet.css'
 
 function WalletPage({ navigate }) {
@@ -493,14 +494,25 @@ function WalletPage({ navigate }) {
         onNotification={() => navigate(ROUTE_PATHS.notification)}
       />
 
-      <div className="win-strip">
-        Win Amount :- <span>{credit}</span>
-      </div>
+      <section className="wallet-win-strip win-strip" aria-live="polite">
+        <div className="wallet-win-strip-inner">
+          <span className="wallet-win-label">Win amount</span>
+          <span className="wallet-win-value">₹ {Number(credit).toLocaleString('en-IN')}</span>
+        </div>
+      </section>
 
       <main className="wallet-content">
-        {loading ? <p className="state-text">Loading wallet data...</p> : null}
+        {loading ? (
+          <div className="wallet-loading" aria-busy aria-label="Loading wallet">
+            <div className="wallet-skeleton wallet-skeleton-card" />
+            <div className="wallet-skeleton wallet-skeleton-input" />
+            <div className="wallet-skeleton wallet-skeleton-btn" />
+            <div className="wallet-skeleton wallet-skeleton-table" />
+          </div>
+        ) : null}
         {error ? <p className="state-text error">{error}</p> : null}
 
+        {!loading ? (
         <section className="wallet-card">
           <div className="wallet-tabs">
             <button
@@ -508,7 +520,7 @@ function WalletPage({ navigate }) {
               className={`wallet-tab ${activeTab === 'add' ? 'active' : ''}`}
               onClick={() => setActiveTab('add')}
             >
-              Add Point
+              Add points
             </button>
             <button
               type="button"
@@ -520,11 +532,15 @@ function WalletPage({ navigate }) {
           </div>
 
           <div className="input-box">
-            <span className="input-icon">🏛️</span>
+            <span className="input-icon" aria-hidden>
+              ₹
+            </span>
             <input
               value={amount}
               onChange={(event) => setAmount(event.target.value.replace(/[^\d]/g, ''))}
-              placeholder="Enter Amount"
+              placeholder="Enter amount"
+              inputMode="numeric"
+              autoComplete="off"
             />
           </div>
 
@@ -598,7 +614,7 @@ function WalletPage({ navigate }) {
                   {maxDeposit > 0 ? ` / Max ${maxDeposit}` : ''}
                 </div>
               ) : null}
-              <div className="wallet-note">Use gateway and complete payment to add points.</div>
+              <p className="wallet-hint">Complete payment in your app to add points.</p>
             </>
           ) : (
             <>
@@ -670,13 +686,15 @@ function WalletPage({ navigate }) {
               {!withdrawDisabled && minRedeem > 0 ? (
                 <div className="wallet-note">Minimum Redeem: {minRedeem}</div>
               ) : null}
-              <div className="wallet-note">⏲️ {withdrawTimeText}</div>
+              <p className="wallet-hint wallet-hint--time">⏲️ {withdrawTimeText}</p>
             </>
           )}
         </section>
+        ) : null}
 
+        {!loading ? (
         <section className="history-card">
-          <h3>{activeTab === 'withdraw' ? 'Withdraw History' : 'Wallet History'}</h3>
+          <h3>{activeTab === 'withdraw' ? 'Withdraw history' : 'Wallet history'}</h3>
           <div className="history-table-wrap">
             {activeTab === 'withdraw' ? (
               <table>
@@ -720,7 +738,11 @@ function WalletPage({ navigate }) {
                   {walletRows.map((row, index) => (
                     <tr key={row.transaction_id || `${row.datetime || 'dt'}-${index}`}>
                       <td>{index + 1}</td>
-                      <td>{row.market ? `${row.remark || '--'} ${row.market}` : row.remark || '--'}</td>
+                      <td>
+                        {formatMarketDisplayName(
+                          row.market ? `${row.remark || '--'} ${row.market}` : row.remark || '--'
+                        )}
+                      </td>
                       <td>{row.datetime || '--'}</td>
                       <td>{row.amount ?? '--'}</td>
                     </tr>
@@ -735,6 +757,7 @@ function WalletPage({ navigate }) {
             )}
           </div>
         </section>
+        ) : null}
       </main>
 
       <nav className="bottom-nav">

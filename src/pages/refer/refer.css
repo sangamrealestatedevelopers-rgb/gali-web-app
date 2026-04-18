@@ -7,7 +7,7 @@
 
 .refer-topbar {
   height: 76px;
-  background: #241a20;
+  background: var(--color-topbar-dark);
   color: #fff;
   display: grid;
   grid-template-columns: 42px 24px 1fr auto;
@@ -84,7 +84,7 @@
   height: 52px;
   display: grid;
   place-items: center;
-  background: #2a2026;
+  background: var(--color-auth-btn);
   color: #fff;
   font-size: 35px;
 }

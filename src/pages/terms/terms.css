@@ -7,7 +7,7 @@
 
 .terms-topbar {
   height: 76px;
-  background: #241a20;
+  background: var(--color-topbar-dark);
   color: #fff;
   display: grid;
   grid-template-columns: 42px 24px 1fr auto;

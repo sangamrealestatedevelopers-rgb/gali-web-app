@@ -7,6 +7,7 @@ import SideDrawer from '../common/SideDrawer'
 import MessageDialog from '../common/MessageDialog'
 import AppIcon from '../common/AppIcon'
 import Header from '../common/Header'
+import { formatMarketDisplayName } from '../../utils/marketDisplayName'
 import './marketPlay.css'
 
 const jodiNumbers = Array.from({ length: 100 }, (_, index) => String(index).padStart(2, '0'))
@@ -225,7 +226,7 @@ function MarketPlayPage({ navigate }) {
         <button type="button" className="back-btn" onClick={() => navigate(ROUTE_PATHS.play)}>
           ←
         </button>
-        <h1>{market.name || market.id}</h1>
+        <h1>{formatMarketDisplayName(market.name) || market.id}</h1>
       </div>
 
       <div className="tab-row">

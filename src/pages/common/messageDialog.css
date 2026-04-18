@@ -41,7 +41,7 @@
   height: 42px;
   border: none;
   border-radius: 8px;
-  background: #2a2026;
+  background: var(--color-auth-btn);
   color: #fff;
   font-size: 16px;
   font-weight: 700;

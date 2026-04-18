@@ -6,6 +6,7 @@ import { getSession } from '../../services/sessionService'
 import SideDrawer from '../common/SideDrawer'
 import AppIcon from '../common/AppIcon'
 import Header from '../common/Header'
+import { formatMarketDisplayName } from '../../utils/marketDisplayName'
 import './home.css'
 
 function HomePage({ navigate }) {
@@ -77,45 +78,76 @@ function HomePage({ navigate }) {
       />
 
       <main className="home-content">
-        {loading ? <p className="state-text">Loading home data...</p> : null}
+        {loading ? (
+          <div className="home-loading" aria-busy aria-label="Loading home">
+            <div className="home-skeleton home-skeleton-hero" />
+            <div className="home-skeleton home-skeleton-strip" />
+            <div className="home-skeleton home-skeleton-card" />
+            <div className="home-skeleton home-skeleton-card" />
+          </div>
+        ) : null}
         {error ? <p className="state-text error">{error}</p> : null}
 
         {!loading && !error ? (
-          <section className="hero-result-card">
-            <div className="hero-date">Date: {todayText}</div>
-            <div className="hero-body">
-              <h4>{notice || 'Not Available'}</h4>
-              <h4>Result Not Available</h4>
-            </div>
-            <button
-              type="button"
-              className="share-earn-btn"
-              onClick={() => navigate(ROUTE_PATHS.referShare)}
-            >
-              शेयर 🔗 SHARE &amp; EARN
-            </button>
-          </section>
-        ) : null}
+          <>
+            <section className="hero-result-card">
+              <div className="hero-date">
+                <span className="hero-date-badge">Today</span>
+                <span className="hero-date-text">{todayText}</span>
+              </div>
+              <div className="hero-body">
+                <p className="hero-notice-label">Notice</p>
+                <p className="hero-notice">{notice || 'No notice posted yet.'}</p>
+                <div className="hero-status">
+                  <span className="hero-status-pill">Result</span>
+                  <span className="hero-status-value">Not available</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="share-earn-btn"
+                onClick={() => navigate(ROUTE_PATHS.referShare)}
+              >
+                <span className="share-earn-icon" aria-hidden>
+                  🔗
+                </span>
+                <span className="share-earn-label">शेयर · SHARE &amp; EARN</span>
+              </button>
+            </section>
 
-        <div className="live-strip">🔥 LIVE RESULT OF {todayText}</div>
+            <div className="live-strip" role="status">
+              <span className="live-strip-icon" aria-hidden>
+                🔥
+              </span>
+              <span className="live-strip-text">LIVE RESULT · {todayText}</span>
+            </div>
+          </>
+        ) : null}
 
         {!loading &&
           !error &&
           markets.map((item) => (
-            <Card key={item.market_id} className="market-card" elevation={2}>
+            <Card key={item.market_id} className="market-card" elevation={0}>
               <CardContent className="market-card-content">
-              <h3>{item.market_name}</h3>
-              <p className="result-time">
-                Result At <strong>{item.resultTime || '--'}</strong>
-              </p>
-              <div className="result-head">
-                <span>Previous Result</span>
-                <span>Today Result</span>
-              </div>
-              <div className="result-values">
-                <span>{item.market_result_previous_day || '--'}</span>
-                <span>{item.market_result || '--'}</span>
-              </div>
+                <div className="market-card-head">
+                  <h3>{formatMarketDisplayName(item.market_name)}</h3>
+                </div>
+                <div className="market-card-body">
+                  <p className="result-time">
+                    Result at{' '}
+                    <strong>{item.resultTime || '--'}</strong>
+                  </p>
+                  <div className="result-grid">
+                    <div className="result-cell">
+                      <span className="result-cell-label">Previous</span>
+                      <span className="result-cell-value">{item.market_result_previous_day || '—'}</span>
+                    </div>
+                    <div className="result-cell result-cell--today">
+                      <span className="result-cell-label">Today</span>
+                      <span className="result-cell-value">{item.market_result || '—'}</span>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           ))}

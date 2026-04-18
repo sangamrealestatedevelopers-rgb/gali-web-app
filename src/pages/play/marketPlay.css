@@ -1,13 +1,13 @@
 .market-play-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #eef4ff 0%, #e5efff 100%);
+  background: linear-gradient(180deg, var(--color-soft) 0%, var(--color-soft-alt) 100%);
   padding-top: 76px;
   padding-bottom: 88px;
 }
 
 .market-topbar {
   height: 76px;
-  background: #0b5ed7;
+  background: var(--color-primary);
   color: #fff;
   display: grid;
   grid-template-columns: 42px 24px 1fr auto;
@@ -67,8 +67,8 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #dbeafe;
-  color: #0b5ed7;
+  background: var(--color-chip-bg);
+  color: var(--color-primary);
   display: grid;
   place-items: center;
   font-weight: 700;
@@ -91,9 +91,9 @@
 
 .market-header-row {
   height: 64px;
-  background: #084298;
-  border-top: 1px solid #2f80ed;
-  border-bottom: 1px solid #2f80ed;
+  background: var(--color-accent-dark);
+  border-top: 1px solid var(--color-primary-mid);
+  border-bottom: 1px solid var(--color-primary-mid);
   color: #fff;
   display: grid;
   grid-template-columns: 44px 1fr;
@@ -116,22 +116,22 @@
 .tab-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  background: #0b5ed7;
+  background: var(--color-primary);
 }
 
 .tab-row button {
   border: none;
   height: 54px;
   background: transparent;
-  color: #dce8ff;
+  color: var(--color-nav-muted);
   font-size: 24px;
   font-weight: 600;
 }
 
 .tab-row button.active {
   background: #ffffff;
-  color: #0b5ed7;
-  border-bottom: 4px solid #0b5ed7;
+  color: var(--color-primary);
+  border-bottom: 4px solid var(--color-primary);
 }
 
 .market-content {
@@ -162,7 +162,7 @@
 }
 
 .cell-card {
-  border: 1px solid #c7dcff;
+  border: 1px solid var(--color-border-soft);
   border-radius: 8px;
   overflow: hidden;
   background: #fff;
@@ -170,7 +170,7 @@
 
 .cell-head {
   height: 38px;
-  background: #0b5ed7;
+  background: var(--color-primary);
   color: #fff;
   display: grid;
   place-items: center;
@@ -179,7 +179,7 @@
 }
 
 .cell-head.selected {
-  background: #084298;
+  background: var(--color-accent-dark);
 }
 
 .cell-card input {
@@ -209,7 +209,7 @@
   width: 100%;
   box-sizing: border-box;
   height: 56px;
-  border: 1px solid #9dc3ff;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   padding: 0 10px;
   font-size: 34px;
@@ -221,7 +221,7 @@
   height: 56px;
   border: none;
   border-radius: 8px;
-  background: #0b5ed7;
+  background: var(--color-primary);
   color: #fff;
   font-size: 40px;
 }
@@ -240,8 +240,8 @@
 }
 
 .bet-table th {
-  color: #0c2a57;
-  background: #eaf2ff;
+  color: var(--color-text);
+  background: var(--color-soft);
 }
 
 .delete-btn {
@@ -280,7 +280,7 @@
   right: 0;
   bottom: 0;
   height: 74px;
-  background: #0b5ed7;
+  background: var(--color-primary);
   color: #fff;
   display: flex;
   align-items: center;
@@ -299,8 +299,8 @@
   border-radius: 10px;
   border: 2px solid rgba(255, 255, 255, 0.5);
   background: #ffffff;
-  color: #0b5ed7;
-  border: 2px solid #9dc3ff;
+  color: var(--color-primary);
+  border: 2px solid var(--color-border);
   font-size: 24px;
   font-weight: 700;
 }
