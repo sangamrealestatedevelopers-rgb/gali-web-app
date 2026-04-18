@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 module.exports = async () => {
   // Connect to MongoDB
   mongoose.connect(
-    "mongodb+srv://rajaking01300_db_user:6zUMkN4xAugaaIcR@cluster0.xolgl2r.mongodb.net/?appName=Cluster0",
+    "mongodb+srv://sangamrealestatedevelopers_db_user:tbsuUEmt40LqJ5Pp@mt-gali.va0c1wh.mongodb.net/?appName=mt-gali",
     {
       useNewUrlParser: true,
       useUnifiedTopology: true,

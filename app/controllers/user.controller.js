@@ -33,7 +33,18 @@ const sendOtpViaUrl = async (mobileNum, otp) => {
   return response.data.requestId;
 };
 
-exports.POMregisterstep1 = async (req, res) => {
+function generateUserId(fullName, mobileNum) {
+  const tr_name = fullName.substring(0, 2).toUpperCase();
+  const tr_id = mobileNum.slice(-5);
+  const rand1 = Math.floor(Math.random() * (8888 - 2222 + 1)) + 2222;
+  const rand2 = Math.floor(Math.random() * (99 - 11 + 1)) + 11;
+  return `${tr_name}${tr_id}${rand1}${rand2}`;
+}
+
+/**
+ * Direct registration (no OTP). Used by register-step1 and /register.
+ */
+async function registerUserDirect(req, res) {
   const {
     app_id,
     pss,
@@ -47,13 +58,18 @@ exports.POMregisterstep1 = async (req, res) => {
     mobileNum,
   } = req.body;
 
-  // Input validation
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ success: 0, message: "Please enter name" });
+  }
+  if (!pss) {
+    return res.status(400).json({ success: 0, message: "Please enter password" });
+  }
   if (!mobileNum) {
     return res
       .status(400)
       .json({ success: 0, message: "Please enter mobile number" });
   }
-  if (!/^\d{10}$/.test(mobileNum)) {
+  if (!/^\d{10}$/.test(String(mobileNum))) {
     return res.status(400).json({
       success: 0,
       message: "Mobile number should contain only 10 digits.",
@@ -61,7 +77,6 @@ exports.POMregisterstep1 = async (req, res) => {
   }
 
   try {
-    // Check if mobile number already exists
     const existingUser = await User.findOne({ mob: mobileNum, app_id: app_id });
     if (existingUser) {
       return res.status(400).json({
@@ -71,8 +86,7 @@ exports.POMregisterstep1 = async (req, res) => {
       });
     }
 
-    // Validate referral code if provided
-    if (refercode && refercode !== "null") {
+    if (refercode && refercode !== "null" && String(refercode).trim() !== "") {
       const referralUser = await User.findOne({
         ref_code: refercode,
         app_id: app_id,
@@ -84,145 +98,21 @@ exports.POMregisterstep1 = async (req, res) => {
       }
     }
 
-    // **Fix OTP to 123456**
-    // const otp = "123456";
-
-    // Simulate OTP sent successfully without calling an actual SMS API
-    // const requestId = "STATIC_OTP_123456"; // You can use any static request ID
-
-    // Save OTP to temporary collection
-    // const existingTempUser = await userTempModal.findOne({ mob: mobileNum });
-    // if (existingTempUser) {
-    //   existingTempUser.otp = otp;
-    //   await existingTempUser.save();
-    // } else {
-    //   const newTempUser = new userTempModal({ mob: mobileNum, otp: otp });
-    //   await newTempUser.save();
-    // }
-
-    var otp = Math.floor(100000 + Math.random() * 900000);
-    var reqiestid = await sendOtpViaUrl(mobileNum, otp);
-
-    const userTemps = await userTempModal.findOne({
-      mob: mobileNum,
-    });
-    if (userTemps) {
-      await userTempModal.updateOne(
-        { mob: mobileNum },
-        {
-          $set: {
-            otp: reqiestid,
-          },
-        }
-      );
-    } else {
-      const data = {
-        otp: reqiestid,
-        mob: mobileNum,
-      };
-
-      const usertemp = new userTempModal(data);
-      const usertempSave = await usertemp.save();
-    }
-
-    return res.status(200).json({
-      success: 1,
-      message: "OTP sent successfully",
-      reqiestid,
-      otp,
-      device_id: dev_id,
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: 0, message: "Error sending OTP" });
-  }
-};
-function generateUserId(fullName, mobileNum) {
-  const tr_name = fullName.substring(0, 2).toUpperCase(); // First 2 characters in uppercase
-  const tr_id = mobileNum.slice(-5); // Last 5 digits of mobile number
-  const rand1 = Math.floor(Math.random() * (8888 - 2222 + 1)) + 2222; // Random between 2222-8888
-  const rand2 = Math.floor(Math.random() * (99 - 11 + 1)) + 11; // Random between 11-99
-  return `${tr_name}${tr_id}${rand1}${rand2}`;
-}
-
-exports.POMregister = async (req, res) => {
-  const {
-    app_id,
-    pss,
-    name,
-    refercode,
-    lat,
-    lng,
-    dev_model,
-    dev_name,
-    dev_id,
-    mobileNum,
-    otp,
-  } = req.body;
-
-  if (!otp) {
-    return res
-      .status(400)
-      .json({ success: 0, message: "Please enter valid OTP!" });
-  }
-  if (!mobileNum || !/^[0-9]{10}$/.test(mobileNum)) {
-    return res.status(400).json({
-      success: 0,
-      message: "Please enter a valid 10-digit mobile number.",
-    });
-  }
-
-  try {
-    // Verify OTP
-    const tempUser = await userTempModal.findOne({ mob: mobileNum });
-    // if (!tempUser || tempUser.otp !== otp) {
-    //   return res.status(400).json({ success: 0, message: "Invalid OTP." });
-    // }
-    var reqiestid = await chkOtpViaUrl(tempUser.otp, req.body.otp);
-    console.log("oppppppppppp", reqiestid);
-    if (reqiestid == "Invalid otp") {
-      return res.status(200).json({
-        success: "3",
-        message: "Invalid Otp",
-      });
-    }
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ mob: mobileNum, app_id });
-    if (existingUser) {
-      return res.status(400).json({
-        success: 0,
-        message: "Mobile number already exists, please try another.",
-      });
-    }
-
-    // Generate authentication token and referral code
-    // const auth = crypto.randomBytes(16).toString("hex");
-    // const ref_code = crypto.randomBytes(3).toString("hex").toUpperCase();
     var uniqueToken = randomstring.generate({
       length: 70,
       charset: "alphanumeric",
     });
 
-    await User.updateOne(
-      { mob: req.body.mobileNum },
-      {
-        $set: {
-          login_token: uniqueToken,
-        },
-      }
-    );
-    const auth = "ghdddddddddddddddddddxcbvxjdddddddgmxzjdfsdjfsjdfkzxcx";
+    const auth =
+      "ghdddddddddddddddddddxcbvxjdddddddgmxzjdfsdjfsjdfkzxcx";
 
     let ref_code = randomstring.generate({
       length: 6,
       charset: "numeric",
     });
-    // const ref_code = "758678";
 
-    // Validate referral code
     let referrer = null;
-    if (refercode && refercode !== "null") {
+    if (refercode && refercode !== "null" && String(refercode).trim() !== "") {
       referrer = await User.findOne({ ref_code: refercode, app_id });
       if (!referrer) {
         return res
@@ -230,8 +120,9 @@ exports.POMregister = async (req, res) => {
           .json({ success: 0, message: "Invalid Referral Code." });
       }
     }
+
     const user_id = generateUserId(name, mobileNum);
-    // Create new user
+
     const newUser = new User({
       app_id,
       us_pass: pss,
@@ -244,12 +135,13 @@ exports.POMregister = async (req, res) => {
       user_id,
       device_id: dev_id,
       ref_code,
-      ref_by: refercode ? refercode : "",
+      ref_by: refercode && refercode !== "null" ? refercode : "",
       referrer: referrer ? referrer._id : null,
       login_token: uniqueToken,
     });
 
     await newUser.save();
+
     return res.status(201).json({
       success: 1,
       message: "User registered successfully!",
@@ -260,7 +152,11 @@ exports.POMregister = async (req, res) => {
     console.error(error);
     return res.status(500).json({ success: 0, message: "Server error." });
   }
-};
+}
+
+exports.POMregisterstep1 = registerUserDirect;
+/** Same as step1 — OTP flow removed; kept for older clients calling /register */
+exports.POMregister = registerUserDirect;
 
 // exports.POMregisterstep1 = async (req, res) => {
 //   const {
