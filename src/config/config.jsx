@@ -1,5 +1,16 @@
+/** Ensures user API calls hit `.../api/users` (fixes "Cannot POST /register-step1"). */
+function normalizeUserApiBaseUrl(url) {
+  const fallback = 'http://localhost:30000/api/users'
+  let base = String(url ?? fallback).trim().replace(/\/+$/, '')
+  if (!base) base = fallback
+  if (!base.endsWith('/api/users')) {
+    base = `${base}/api/users`.replace(/([^:]\/)\/+/g, '$1')
+  }
+  return base
+}
+
 export const APP_CONFIG = {
-  baseUrl: import.meta.env.VITE_API_BASE_URL || 'https://api.24x7good.com/api/users',
+  baseUrl: normalizeUserApiBaseUrl(import.meta.env.VITE_API_BASE_URL),
   appId: import.meta.env.VITE_APP_ID || 'com.dubaiking',
   devId: import.meta.env.VITE_DEV_ID || 'undefined',
   paymentGatewayUrl:
