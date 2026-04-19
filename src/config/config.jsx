@@ -15,7 +15,7 @@ export const APP_CONFIG = {
   devId: import.meta.env.VITE_DEV_ID || 'undefined',
   paymentGatewayUrl:
     import.meta.env.VITE_PAYMENT_GATEWAY_URL ||
-    'https://admin.24x7good.com/public/payment-getway',
+    'https://gali-admin.onrender.com/public/payment-getway',
 }
 
 export const API_ENDPOINTS = {
