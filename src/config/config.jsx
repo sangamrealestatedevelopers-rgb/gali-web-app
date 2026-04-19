@@ -1,6 +1,6 @@
 /** Ensures user API calls hit `.../api/users` (fixes "Cannot POST /register-step1"). */
 function normalizeUserApiBaseUrl(url) {
-  const fallback = 'http://localhost:30000/api/users'
+  const fallback = 'https://gali-web-app-api.onrender.com/api/users'
   let base = String(url ?? fallback).trim().replace(/\/+$/, '')
   if (!base) base = fallback
   if (!base.endsWith('/api/users')) {
