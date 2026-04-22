@@ -3,7 +3,7 @@ import { ROUTE_PATHS } from '../routes'
 import { getAppNotice, getUserCredit } from '../../services/homeService'
 import { getSession } from '../../services/sessionService'
 import SideDrawer from '../common/SideDrawer'
-import AppIcon from '../common/AppIcon'
+import BottomNav from '../common/BottomNav'
 import Header from '../common/Header'
 import './notification.css'
 
@@ -76,24 +76,7 @@ function NotificationPage({ navigate }) {
         ) : null}
       </main>
 
-      <nav className="bottom-nav">
-        <button type="button" className="nav-item active" onClick={() => navigate(ROUTE_PATHS.home)}>
-          <AppIcon name="home" className="nav-icon" />
-          <span>Home</span>
-        </button>
-        <button type="button" className="nav-item" onClick={() => navigate(ROUTE_PATHS.play)}>
-          <AppIcon name="sports_esports" className="nav-icon" />
-          <span>Play</span>
-        </button>
-        <button type="button" className="nav-item" onClick={() => navigate(ROUTE_PATHS.wallet)}>
-          <AppIcon name="account_balance_wallet" className="nav-icon" />
-          <span>Wallet</span>
-        </button>
-        <button type="button" className="nav-item" onClick={() => navigate(ROUTE_PATHS.myGame)}>
-          <AppIcon name="stadia_controller" className="nav-icon" />
-          <span>My Game</span>
-        </button>
-      </nav>
+      <BottomNav activeTab="home" navigate={navigate} />
 
       <SideDrawer
         isOpen={drawerOpen}

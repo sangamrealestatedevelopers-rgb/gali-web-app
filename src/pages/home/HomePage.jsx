@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '@mui/material'
 import { ROUTE_PATHS } from '../routes'
 import { getAppNotice, getHelpNumber, getHomeDashboard, getUserCredit, getUserProfile } from '../../services/homeService'
+import { getMarketList } from '../../services/playService'
 import { getSession } from '../../services/sessionService'
 import SideDrawer from '../common/SideDrawer'
-import AppIcon from '../common/AppIcon'
+import BottomNav from '../common/BottomNav'
 import Header from '../common/Header'
 import { formatMarketDisplayName } from '../../utils/marketDisplayName'
 import './home.css'
@@ -31,18 +32,45 @@ function HomePage({ navigate }) {
       setError('')
 
       try {
-        const [profileData, dashboardData, creditData, noticeData, helpData] = await Promise.all([
+        const [profileData, dashboardData, creditData, noticeData, helpData, marketData] = await Promise.all([
           getUserProfile(session.userId),
           getHomeDashboard(session.userId),
           getUserCredit(session.userId),
           getAppNotice(session.userId),
           getHelpNumber(),
+          getMarketList(session.userId),
         ])
 
         setProfile(profileData)
-        setMarkets(Array.isArray(dashboardData.data) ? dashboardData.data : [])
+        const dashboardMarkets = Array.isArray(dashboardData.data) ? dashboardData.data : []
+        const playableMarkets = Array.isArray(marketData) ? marketData : []
+        const marketById = new Map(
+          playableMarkets.map((item) => [String(item.id || '').trim(), item])
+        )
+        const marketByName = new Map(
+          playableMarkets.map((item) => [String(item.name || '').trim().toUpperCase(), item])
+        )
+        const mergedMarkets = dashboardMarkets.map((item) => {
+          const matchById = marketById.get(String(item.market_id || '').trim())
+          const matchByName = marketByName.get(String(item.market_name || '').trim().toUpperCase())
+          const match = matchById || matchByName || {}
+          return {
+            ...item,
+            open_time: match.open_time || '--',
+            time: match.time || '--',
+            is_play: String(match.is_play ?? '0'),
+            market_name: item.market_name || match.name || '--',
+            market_id: item.market_id || match.id || '',
+          }
+        })
+        setMarkets(mergedMarkets)
         setCredit(Number(creditData || dashboardData.user_balance || 0))
-        setNotice(noticeData[0]?.short_description || noticeData[0]?.description || '')
+        const noticeItems = Array.isArray(noticeData) ? noticeData : []
+        const noticeText = noticeItems
+          .map((item) => item?.short_description || item?.description || '')
+          .filter(Boolean)
+          .join('   •   ')
+        setNotice(noticeText)
         setHelp(helpData)
       } catch (apiError) {
         setError(apiError instanceof Error ? apiError.message : 'Unable to fetch home data.')
@@ -68,6 +96,21 @@ function HomePage({ navigate }) {
 
   if (!session?.userId) return null
 
+  const openMarketPlay = (market) => {
+    if (String(market.is_play) !== '1') return
+    sessionStorage.setItem(
+      'selected_market',
+      JSON.stringify({
+        id: market.market_id,
+        name: market.market_name,
+        open_time: market.open_time,
+        time: market.time,
+        is_play: market.is_play,
+      })
+    )
+    navigate(ROUTE_PATHS.playMarket)
+  }
+
   return (
     <div className="home-page">
       <Header
@@ -87,33 +130,15 @@ function HomePage({ navigate }) {
           </div>
         ) : null}
         {error ? <p className="state-text error">{error}</p> : null}
-
+        <div className="hero-notice-ticker" role="status" aria-live="polite">
+                  <div className="hero-notice-track">
+                    <span>{notice || 'No notice posted yet.'}</span>
+                    <span aria-hidden>{notice || 'No notice posted yet.'}</span>
+                  </div>
+                </div>
         {!loading && !error ? (
           <>
-            <section className="hero-result-card">
-              <div className="hero-date">
-                <span className="hero-date-badge">Today</span>
-                <span className="hero-date-text">{todayText}</span>
-              </div>
-              <div className="hero-body">
-                <p className="hero-notice-label">Notice</p>
-                <p className="hero-notice">{notice || 'No notice posted yet.'}</p>
-                <div className="hero-status">
-                  <span className="hero-status-pill">Result</span>
-                  <span className="hero-status-value">Not available</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="share-earn-btn"
-                onClick={() => navigate(ROUTE_PATHS.referShare)}
-              >
-                <span className="share-earn-icon" aria-hidden>
-                  🔗
-                </span>
-                <span className="share-earn-label">शेयर · SHARE &amp; EARN</span>
-              </button>
-            </section>
+           
 
             <div className="live-strip" role="status">
               <span className="live-strip-icon" aria-hidden>
@@ -134,6 +159,9 @@ function HomePage({ navigate }) {
                 </div>
                 <div className="market-card-body">
                   <p className="result-time">
+                    {item.open_time || '--'} - <strong>{item.time || '--'}</strong>
+                  </p>
+                  <p className="result-time">
                     Result at{' '}
                     <strong>{item.resultTime || '--'}</strong>
                   </p>
@@ -147,30 +175,20 @@ function HomePage({ navigate }) {
                       <span className="result-cell-value">{item.market_result || '—'}</span>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    className={`market-play-btn ${String(item.is_play) === '1' ? 'play' : 'timeout'}`}
+                    onClick={() => openMarketPlay(item)}
+                  >
+                    {String(item.is_play) === '1' ? 'Play Games' : 'Time Out'}
+                  </button>
                 </div>
               </CardContent>
             </Card>
           ))}
       </main>
 
-      <nav className="bottom-nav">
-        <button type="button" className="nav-item active">
-          <AppIcon name="home" className="nav-icon" />
-          <span>Home</span>
-        </button>
-        <button type="button" className="nav-item" onClick={() => navigate(ROUTE_PATHS.play)}>
-          <AppIcon name="sports_esports" className="nav-icon" />
-          <span>Play</span>
-        </button>
-        <button type="button" className="nav-item" onClick={() => navigate(ROUTE_PATHS.wallet)}>
-          <AppIcon name="account_balance_wallet" className="nav-icon" />
-          <span>Wallet</span>
-        </button>
-        <button type="button" className="nav-item" onClick={() => navigate(ROUTE_PATHS.myGame)}>
-          <AppIcon name="stadia_controller" className="nav-icon" />
-          <span>My Game</span>
-        </button>
-      </nav>
+      <BottomNav activeTab="home" navigate={navigate} />
 
       <SideDrawer
         isOpen={drawerOpen}

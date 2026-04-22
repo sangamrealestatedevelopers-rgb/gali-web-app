@@ -3,7 +3,7 @@ import { getUserCredit, getUserProfile } from '../../services/homeService'
 import { getSession } from '../../services/sessionService'
 import { ROUTE_PATHS } from '../routes'
 import SideDrawer from '../common/SideDrawer'
-import AppIcon from '../common/AppIcon'
+import BottomNav from '../common/BottomNav'
 import MessageDialog from '../common/MessageDialog'
 import Header from '../common/Header'
 import './referShare.css'
@@ -42,6 +42,13 @@ function ReferSharePage({ navigate }) {
       `अपने दोस्तों को रेफर करें और अपने दोस्तों की प्रत्येक हानि बोली (बुकिंग) पर 5% कमीशन राशि प्राप्त करें रेफरल कोड का उपयोग करके | रेफरल कोड ${refCode} https://24x7good.com/`,
     [refCode]
   )
+  const todayText = useMemo(() => {
+    const now = new Date()
+    const dd = String(now.getDate()).padStart(2, '0')
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const yyyy = String(now.getFullYear())
+    return `${dd}-${mm}-${yyyy}`
+  }, [])
 
   const onShare = async () => {
     try {
@@ -84,36 +91,31 @@ function ReferSharePage({ navigate }) {
       />
 
       <main className="refer-share-content">
-        <h2>Refer &amp; Earn</h2>
-        <p>अगर आप को अपने friend को डाउनलोड करवाते हो तो आपको 5% कमीशन कमा सकते हो | ये 5% कमीशन आपको लाइफ टाइम मिलेगा |</p>
-        <p>
-          नोट : आपको 5% कमीशन तभी मिलेगा अगर आपका कोई friend गेम खेलता है । और उस गेम से कंपनी को जो
-          Profit हुआ उसका 5% आपको मिलेगा ।
-        </p>
-
-        <button type="button" className="refer-share-btn" onClick={onShare}>
-          Share &amp; Earn
-        </button>
+        <section className="hero-result-card">
+          <div className="hero-date">
+            <span className="hero-date-badge">Today</span>
+            <span className="hero-date-text">{todayText}</span>
+          </div>
+          <div className="hero-body">
+            <p className="hero-notice-label">Refer &amp; Earn</p>
+            <p className="hero-notice">
+              अगर आप किसी friend को invite करते हैं तो आपको उसके खेल से lifetime 5% commission मिलेगा।
+            </p>
+            <div className="hero-status">
+              <span className="hero-status-pill">Referral Code</span>
+              <span className="hero-status-value">{refCode || '---'}</span>
+            </div>
+          </div>
+          <button type="button" className="share-earn-btn" onClick={onShare}>
+            <span className="share-earn-icon" aria-hidden>
+              🔗
+            </span>
+            <span className="share-earn-label">Share Referral Link</span>
+          </button>
+        </section>
       </main>
 
-      <nav className="bottom-nav">
-        <button type="button" className="nav-item" onClick={() => navigate(ROUTE_PATHS.home)}>
-          <AppIcon name="home" className="nav-icon" />
-          <span>Home</span>
-        </button>
-        <button type="button" className="nav-item" onClick={() => navigate(ROUTE_PATHS.play)}>
-          <AppIcon name="sports_esports" className="nav-icon" />
-          <span>Play</span>
-        </button>
-        <button type="button" className="nav-item" onClick={() => navigate(ROUTE_PATHS.wallet)}>
-          <AppIcon name="account_balance_wallet" className="nav-icon" />
-          <span>Wallet</span>
-        </button>
-        <button type="button" className="nav-item active" onClick={() => navigate(ROUTE_PATHS.myGame)}>
-          <AppIcon name="stadia_controller" className="nav-icon" />
-          <span>My Game</span>
-        </button>
-      </nav>
+      <BottomNav activeTab="refer" navigate={navigate} />
 
       <SideDrawer
         isOpen={drawerOpen}

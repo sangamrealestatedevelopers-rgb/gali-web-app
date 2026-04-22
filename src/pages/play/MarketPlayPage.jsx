@@ -236,12 +236,12 @@ function MarketPlayPage({ navigate }) {
         <button className={activeTab === 'harraf' ? 'active' : ''} onClick={() => setActiveTab('harraf')}>
           Harraf
         </button>
-        <button className={activeTab === 'crossing' ? 'active' : ''} onClick={() => setActiveTab('crossing')}>
+        {/* <button className={activeTab === 'crossing' ? 'active' : ''} onClick={() => setActiveTab('crossing')}>
           Crossing
         </button>
         <button className={activeTab === 'copyPaste' ? 'active' : ''} onClick={() => setActiveTab('copyPaste')}>
           Copy Paste
-        </button>
+        </button> */}
       </div>
 
       <main className="market-content">

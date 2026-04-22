@@ -85,6 +85,8 @@
 
 .refer-share-content {
   padding: 18px 16px;
+  max-width: 480px;
+  margin: 0 auto;
 }
 
 .refer-share-content h2 {
@@ -119,6 +121,110 @@
   color: #383838;
   font-size: 31px;
   font-weight: 500;
+}
+
+.hero-result-card {
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+  border: 1px solid #f4d58a;
+  box-shadow: 0 6px 20px rgba(69, 10, 10, 0.08);
+}
+
+.hero-date {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-mid) 100%);
+  color: #fff;
+}
+
+.hero-date-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 10px;
+}
+
+.hero-date-text {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.hero-body {
+  padding: 16px 14px 10px;
+  text-align: center;
+}
+
+.hero-notice-label {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.hero-notice {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.hero-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px dashed #f3cc75;
+  background: #fff8e8;
+  padding: 10px 12px;
+  box-sizing: border-box;
+}
+
+.hero-status-pill {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #9a3412;
+}
+
+.hero-status-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #a16207;
+  letter-spacing: 0.05em;
+}
+
+.share-earn-btn {
+  margin: 0 12px 14px;
+  width: calc(100% - 24px);
+  border: none;
+  border-radius: 12px;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #7f1d1d 0%, #b45309 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.share-earn-icon {
+  font-size: 18px;
+  line-height: 1;
 }
 
 @media (max-width: 768px) {
